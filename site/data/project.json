@@ -1,0 +1,981 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "title": "Astra Memory Lab",
+    "subtitle": "Franka 真机实验 · 记忆、检索与更新",
+    "version": "0.1.0",
+    "updatedAt": "2026-11-08",
+    "repositoryUrl": "https://github.com/asimfish/robomme-memory-lab",
+    "phase": "实验设计",
+    "robot": "Franka（型号与夹爪待填写）",
+    "cameras": "固定外部视角 + 腕部视角（按实机确认）",
+    "modelVersion": "待填写",
+    "configurationRevision": "待冻结",
+    "notes": "任务参数需经独立预实验确认；正式测试前冻结提示、记忆配置与评分规则。"
+  },
+  "methods": [
+    {
+      "id": "direct",
+      "name": "Astra-Direct",
+      "kind": "baseline",
+      "description": "短期观察，不保留跨调用交互历史。",
+      "control": "统一的绝对末端位姿与夹爪动作接口。"
+    },
+    {
+      "id": "history",
+      "name": "Astra-History",
+      "kind": "baseline",
+      "description": "保留完整文字与决策时刻图像历史，作为主要强基线。",
+      "control": "执行长度、控制器、反馈与 Ours 保持一致。"
+    },
+    {
+      "id": "ours",
+      "name": "Astra + harness",
+      "kind": "ours",
+      "description": "使用我们的记忆保存、检索和更新机制。",
+      "control": "共享相机、标定、动作接口和预算上限。"
+    },
+    {
+      "id": "summary",
+      "name": "Astra-Summary",
+      "kind": "optional",
+      "description": "固定预算的滚动文字摘要，可选补充基线。",
+      "control": "所有摘要与额外模型开销计入总成本。"
+    },
+    {
+      "id": "frozen",
+      "name": "Ours-Frozen",
+      "kind": "ablation",
+      "description": "初始记忆后冻结写入，其余设置与 Ours 一致。",
+      "control": "重点用于 T7，不屏蔽当前感知。"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "累计搬运与多类别计数",
+      "englishTitle": "Count successful events",
+      "suite": "计数",
+      "priority": "核心",
+      "status": "planned",
+      "owner": "",
+      "notes": "",
+      "purpose": "检验实际完成次数的保存、分颜色计数与执行进度更新。",
+      "prompt": "Put three red blocks and two blue blocks into the bin, then press the button to finish. Count only your successful placements; objects added or removed by the experimenter do not change your completed count.",
+      "props": [
+        "红蓝积木与供料区",
+        "不透明收纳盒",
+        "停止按钮"
+      ],
+      "steps": [
+        "展示指令并重置供料区、收纳盒与机器人。",
+        "Franka 逐个搬运；按预先固定的脚本增减盒内物体。",
+        "机器人自行判断累计完成状态并按停止按钮。"
+      ],
+      "conditions": [
+        {
+          "id": "standard",
+          "label": "基础计数",
+          "change": "红色 2 个、蓝色 1 个，保持类别与人工干预规则固定。"
+        },
+        {
+          "id": "high-count",
+          "label": "高计数",
+          "change": "红色 4 个、蓝色 3 个，仅增加目标总数。"
+        }
+      ],
+      "success": [
+        "各颜色累计成功放入次数与指令完全一致。",
+        "实际落入盒中才计数，空抓、滑落与失败放置不计数。",
+        "完成后正确停止，无多放或漏放。"
+      ],
+      "metrics": [
+        "完整回合 SR",
+        "各颜色计数误差",
+        "提前停止 / 多做次数"
+      ],
+      "failures": [
+        "计数遗忘",
+        "类别混淆",
+        "失败动作被计为成功",
+        "提前停止",
+        "多放",
+        "抓取或放置失败"
+      ],
+      "benchmark": [
+        "BinFill",
+        "PickXtimes"
+      ],
+      "designNotes": [
+        "数值为开发阶段建议，正式测试前冻结。",
+        "明确测量累计机器人成功搬运次数；盒内最终数量不作为完成条件。",
+        "供料区数量与初始摆放不能直接暴露剩余次数。"
+      ],
+      "targetPerCondition": 20,
+      "preparation": [
+        {
+          "id": "hardware",
+          "label": "道具、标定与控制器就绪",
+          "done": false
+        },
+        {
+          "id": "development",
+          "label": "独立预实验完成",
+          "done": false
+        },
+        {
+          "id": "frozen",
+          "label": "提示、配置与评分规则冻结",
+          "done": false
+        },
+        {
+          "id": "evaluation",
+          "label": "配对正式测试完成",
+          "done": false
+        },
+        {
+          "id": "review",
+          "label": "结果与视频核对完成",
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "遮挡下的连续追踪",
+      "englishTitle": "Track hidden object associations",
+      "suite": "空间关联",
+      "priority": "核心",
+      "status": "planned",
+      "owner": "",
+      "notes": "",
+      "purpose": "检验遮挡物体与容器的关联能否在连续运动中更新，并按序检索。",
+      "prompt": "Watch the demonstration, then lift the cover hiding the red block, followed by the cover hiding the blue block.",
+      "props": [
+        "4–6 个易抓取的不透明杯罩",
+        "红蓝积木",
+        "可移动遮挡板"
+      ],
+      "steps": [
+        "展示积木与杯罩初始对应关系，再盖住积木。",
+        "按固定示范连续移动或交换杯罩，记录同步观察。",
+        "将实机复位到示范结束状态，机器人按顺序选择并抬起杯罩。"
+      ],
+      "conditions": [
+        {
+          "id": "standard",
+          "label": "基础交换",
+          "change": "无遮挡、少量交换。"
+        },
+        {
+          "id": "continuous",
+          "label": "连续运动",
+          "change": "杯罩数与目标数固定，改为连续重排。"
+        },
+        {
+          "id": "occluded",
+          "label": "局部遮挡",
+          "change": "与无遮挡条件配对，相关信息在至少一个允许视角中可见。"
+        }
+      ],
+      "success": [
+        "首次选择即为正确杯罩，并成功抬起。",
+        "多目标取出顺序正确，打开错误杯罩即判失败。"
+      ],
+      "metrics": [
+        "完整回合 SR",
+        "首次目标选择正确率",
+        "顺序正确率"
+      ],
+      "failures": [
+        "初始关联错误",
+        "运动后身份混淆",
+        "使用旧位置",
+        "取出顺序错误",
+        "抬起失败"
+      ],
+      "benchmark": [
+        "VideoUnmask",
+        "ButtonUnmask",
+        "VideoUnmaskSwap",
+        "ButtonUnmaskSwap"
+      ],
+      "designNotes": [
+        "连续运动与遮挡先分别改变，组合条件另行记录。",
+        "视频结束状态与真实执行场景需要匹配。",
+        "容器外观与隐藏目标随机配对；不提供评分真值。"
+      ],
+      "targetPerCondition": 20,
+      "preparation": [
+        {
+          "id": "hardware",
+          "label": "道具、标定与控制器就绪",
+          "done": false
+        },
+        {
+          "id": "development",
+          "label": "独立预实验完成",
+          "done": false
+        },
+        {
+          "id": "frozen",
+          "label": "提示、配置与评分规则冻结",
+          "done": false
+        },
+        {
+          "id": "evaluation",
+          "label": "配对正式测试完成",
+          "done": false
+        },
+        {
+          "id": "review",
+          "label": "结果与视频核对完成",
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "历史对象检索",
+      "englishTitle": "Recall a demonstrated object set",
+      "suite": "历史指代",
+      "priority": "核心",
+      "status": "planned",
+      "owner": "",
+      "notes": "",
+      "purpose": "检验历史目标集合的保存、运动后的身份保持及执行去重。",
+      "prompt": "Pick up all the blocks that were lifted during the demonstration and place them into the tray, each exactly once.",
+      "props": [
+        "可区分但外观相似的积木",
+        "收纳盘",
+        "不留下标记的示范区域"
+      ],
+      "steps": [
+        "示范依次拿起部分积木并放回。",
+        "按条件保持位置或移动物体，撤去临时提示。",
+        "机器人取出历史目标集合，每个只操作一次。"
+      ],
+      "conditions": [
+        {
+          "id": "standard",
+          "label": "静态检索",
+          "change": "示范后物体保持位置。"
+        },
+        {
+          "id": "moving",
+          "label": "动态身份",
+          "change": "保持候选与目标数不变，示范后移动物体。"
+        }
+      ],
+      "success": [
+        "取出集合与示范目标集合完全一致。",
+        "无误取、漏取或重复取。"
+      ],
+      "metrics": [
+        "严格集合 SR",
+        "目标集合 precision / recall",
+        "重复操作次数"
+      ],
+      "failures": [
+        "忘记目标",
+        "移动后选错身份",
+        "漏取",
+        "重复操作",
+        "抓取失败"
+      ],
+      "benchmark": [
+        "PickHighlight",
+        "VideoRepick"
+      ],
+      "designNotes": [
+        "物体必须在输入视频中可追踪，不能用不可辨识运动制造无解案例。",
+        "最终位置、姿态或残留提示不能直接标出目标。"
+      ],
+      "targetPerCondition": 20,
+      "preparation": [
+        {
+          "id": "hardware",
+          "label": "道具、标定与控制器就绪",
+          "done": false
+        },
+        {
+          "id": "development",
+          "label": "独立预实验完成",
+          "done": false
+        },
+        {
+          "id": "frozen",
+          "label": "提示、配置与评分规则冻结",
+          "done": false
+        },
+        {
+          "id": "evaluation",
+          "label": "配对正式测试完成",
+          "done": false
+        },
+        {
+          "id": "review",
+          "label": "结果与视频核对完成",
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "事件与顺序指代",
+      "englishTitle": "Retrieve the right event",
+      "suite": "历史指代",
+      "priority": "核心",
+      "status": "planned",
+      "owner": "",
+      "notes": "",
+      "purpose": "检验对象、事件顺序、容器身份与当前位置之间的关联检索。",
+      "prompt": "Place the red block on the tray where it was first placed after the button was pressed.",
+      "props": [
+        "4–6 个可移动托盘或圆环",
+        "红色积木与可选干扰积木",
+        "按钮"
+      ],
+      "steps": [
+        "示范积木在托盘之间放置，中间穿插按钮事件。",
+        "托盘在示范过程中交换位置。",
+        "按事件或第 k 次放置的指令，机器人选择对应托盘的当前位置。"
+      ],
+      "conditions": [
+        {
+          "id": "event",
+          "label": "事件指代",
+          "change": "按钮之后第一次放置对应的托盘。"
+        },
+        {
+          "id": "ordinal",
+          "label": "顺序指代",
+          "change": "改用第 k 次放置的托盘；对象和布局难度保持一致。"
+        }
+      ],
+      "success": [
+        "所选历史事件、托盘身份及当前放置位置全部正确。"
+      ],
+      "metrics": [
+        "完整回合 SR",
+        "历史事件选择正确率",
+        "目标托盘选择正确率"
+      ],
+      "failures": [
+        "事件边界错误",
+        "次序错误",
+        "对象历史混淆",
+        "使用托盘旧位置",
+        "放置失败"
+      ],
+      "benchmark": [
+        "VideoPlaceButton",
+        "VideoPlaceOrder"
+      ],
+      "designNotes": [
+        "顺序指令示例：Place the red block on the tray where it was placed for the third time during the demonstration.",
+        "第二个积木的交错历史作为扩展条件，单独报告。",
+        "构造最终画面相同、历史不同且正确答案不同的配对诊断。"
+      ],
+      "targetPerCondition": 20,
+      "preparation": [
+        {
+          "id": "hardware",
+          "label": "道具、标定与控制器就绪",
+          "done": false
+        },
+        {
+          "id": "development",
+          "label": "独立预实验完成",
+          "done": false
+        },
+        {
+          "id": "frozen",
+          "label": "提示、配置与评分规则冻结",
+          "done": false
+        },
+        {
+          "id": "evaluation",
+          "label": "配对正式测试完成",
+          "done": false
+        },
+        {
+          "id": "review",
+          "label": "结果与视频核对完成",
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "轨迹复现与布局迁移",
+      "englishTitle": "Transfer a demonstrated pattern",
+      "suite": "程序记忆",
+      "priority": "核心",
+      "status": "planned",
+      "owner": "",
+      "notes": "",
+      "purpose": "检验示范顺序和空间关系能否在当前布局中复现。",
+      "prompt": "Watch the demonstration, then reproduce the same pattern on the current board, starting from the home position.",
+      "props": [
+        "带固定节点的网格板",
+        "末端指示棒",
+        "可选障碍板"
+      ],
+      "steps": [
+        "用不留痕迹的指示棒示范经过节点的顺序。",
+        "按条件保持网格，或对网格作平移 / 旋转。",
+        "Franka 从统一 home 位姿复现当前网格上的对应图案。"
+      ],
+      "conditions": [
+        {
+          "id": "standard",
+          "label": "同布局复现",
+          "change": "示范与执行布局一致。"
+        },
+        {
+          "id": "transformed",
+          "label": "布局迁移",
+          "change": "仅平移或旋转网格，保持图案关系与路径长度。"
+        },
+        {
+          "id": "routing",
+          "label": "绕障扩展",
+          "change": "单独加入指定绕障侧的路径约束。"
+        }
+      ],
+      "success": [
+        "节点访问顺序完全正确，且进入标定后的目标区域。",
+        "绕障条件经过指定一侧，无错误捷径。"
+      ],
+      "metrics": [
+        "完整回合 SR",
+        "节点顺序正确率",
+        "末端位置误差"
+      ],
+      "failures": [
+        "顺序遗忘",
+        "复用旧坐标",
+        "错误捷径",
+        "工具末端估计错误",
+        "轨迹执行失败"
+      ],
+      "benchmark": [
+        "PatternLock",
+        "RouteStick"
+      ],
+      "designNotes": [
+        "节点判定半径在预实验标定后冻结。",
+        "改变棒长、挂载姿态或障碍布局时分别建条件，不与网格变化混成一个因素。",
+        "示范不可留下可直接照着执行的轨迹。"
+      ],
+      "targetPerCondition": 20,
+      "preparation": [
+        {
+          "id": "hardware",
+          "label": "道具、标定与控制器就绪",
+          "done": false
+        },
+        {
+          "id": "development",
+          "label": "独立预实验完成",
+          "done": false
+        },
+        {
+          "id": "frozen",
+          "label": "提示、配置与评分规则冻结",
+          "done": false
+        },
+        {
+          "id": "evaluation",
+          "label": "配对正式测试完成",
+          "done": false
+        },
+        {
+          "id": "review",
+          "label": "结果与视频核对完成",
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "T6",
+      "title": "示范方法与有限尝试",
+      "englishTitle": "Use feedback across attempts",
+      "suite": "经验利用",
+      "priority": "核心",
+      "status": "planned",
+      "owner": "",
+      "notes": "",
+      "purpose": "检验操作方法记忆，以及第一次失败经验能否改进下一次行动。",
+      "prompt": "Move the block to the target using the same method shown in the demonstration. You have at most two attempts.",
+      "props": [
+        "目标积木与目标区域",
+        "易实现的钩拉工具",
+        "滚动小球或其他可重复的释放装置"
+      ],
+      "steps": [
+        "示范用指定方法达到目标，多种方法具有相似终态。",
+        "机器人选择并复现示范方法。",
+        "有限尝试条件释放后不允许连续修正，按统一规则复位后最多再试一次。"
+      ],
+      "conditions": [
+        {
+          "id": "method",
+          "label": "方法复现",
+          "change": "区分钩拉、滚球等示范方法，方法结果分别报告。"
+        },
+        {
+          "id": "limited",
+          "label": "有限尝试",
+          "change": "固定可重复的释放任务，只允许两次尝试。"
+        },
+        {
+          "id": "feedback-masked",
+          "label": "反馈消融",
+          "change": "第二次尝试前屏蔽第一次经验，其他设置相同。"
+        }
+      ],
+      "success": [
+        "采用示范指定方法，在最多两次尝试内完成目标。",
+        "一次 episode 包含最多两次尝试，两次尝试不当作独立场景。"
+      ],
+      "metrics": [
+        "示范方法选择正确率",
+        "第一次成功率",
+        "两次内成功率",
+        "首次失败后的第二次成功率"
+      ],
+      "failures": [
+        "方法选错",
+        "重复相同失败动作",
+        "调整方向错误",
+        "工具操作失败"
+      ],
+      "benchmark": [
+        "MoveCube"
+      ],
+      "designNotes": [
+        "反馈以共享观察和常规执行反馈提供，不注入真实误差答案。",
+        "第二次改善需结合屏蔽反馈对照解释。",
+        "此任务只覆盖所实现的方法，不代表完整复刻全部工具变体。"
+      ],
+      "targetPerCondition": 20,
+      "preparation": [
+        {
+          "id": "hardware",
+          "label": "道具、标定与控制器就绪",
+          "done": false
+        },
+        {
+          "id": "development",
+          "label": "独立预实验完成",
+          "done": false
+        },
+        {
+          "id": "frozen",
+          "label": "提示、配置与评分规则冻结",
+          "done": false
+        },
+        {
+          "id": "evaluation",
+          "label": "配对正式测试完成",
+          "done": false
+        },
+        {
+          "id": "review",
+          "label": "结果与视频核对完成",
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "T7",
+      "title": "旧记忆失效与更新",
+      "englishTitle": "Replace stale memory",
+      "suite": "记忆更新",
+      "priority": "核心",
+      "status": "planned",
+      "owner": "",
+      "notes": "",
+      "purpose": "直接检验新证据能否更新旧关联，并避免错误覆盖仍有效的记忆。",
+      "prompt": "Retrieve the green block from its current cover.",
+      "props": [
+        "杯罩 A / B 与干扰杯罩",
+        "绿色积木",
+        "固定的无关事件脚本"
+      ],
+      "steps": [
+        "展示绿色积木位于杯罩 A 下，建立初始记忆。",
+        "变化条件将积木清楚地转移至 B；未变化条件拿起后放回 A。",
+        "插入等量无关事件，使关键变化离开短期观察窗口。",
+        "机器人根据历史与当前观察取出目标。"
+      ],
+      "conditions": [
+        {
+          "id": "changed",
+          "label": "位置改变",
+          "change": "新证据替换初始关联，正确目标为 B。"
+        },
+        {
+          "id": "unchanged",
+          "label": "位置未改变",
+          "change": "事件量与时长匹配，正确目标仍为 A。"
+        }
+      ],
+      "success": [
+        "改变时选择新位置，未改变时保留有效旧位置。"
+      ],
+      "metrics": [
+        "完整回合 SR",
+        "旧位置错误率",
+        "未变化条件正确率"
+      ],
+      "failures": [
+        "未更新",
+        "检索失效记录",
+        "错误覆盖有效记录",
+        "抓取失败"
+      ],
+      "benchmark": [
+        "VideoUnmaskSwap",
+        "ButtonUnmaskSwap"
+      ],
+      "designNotes": [
+        "机制比较使用 Astra-History / Ours / Ours-Frozen。",
+        "Frozen 仅冻结初始记忆后的写入，其他观察与执行设置不变。",
+        "所有方法仍获得当前观察；不额外屏蔽 Frozen 的感知输入。"
+      ],
+      "targetPerCondition": 20,
+      "preparation": [
+        {
+          "id": "hardware",
+          "label": "道具、标定与控制器就绪",
+          "done": false
+        },
+        {
+          "id": "development",
+          "label": "独立预实验完成",
+          "done": false
+        },
+        {
+          "id": "frozen",
+          "label": "提示、配置与评分规则冻结",
+          "done": false
+        },
+        {
+          "id": "evaluation",
+          "label": "配对正式测试完成",
+          "done": false
+        },
+        {
+          "id": "review",
+          "label": "结果与视频核对完成",
+          "done": false
+        }
+      ]
+    },
+    {
+      "id": "T8",
+      "title": "第 k 次经过时按按钮",
+      "englishTitle": "Remember and act on time",
+      "suite": "时间敏感",
+      "priority": "可选",
+      "status": "planned",
+      "owner": "",
+      "notes": "",
+      "purpose": "区分事件计数正确与真正及时执行动作。",
+      "prompt": "Press the button when the moving object reaches the target for the fifth time.",
+      "props": [
+        "按真实时间移动的物体或可控运动装置",
+        "目标区与实体按钮",
+        "同步时间戳"
+      ],
+      "steps": [
+        "物体持续经过目标区域，机器人观察并计数。",
+        "Franka 在指定次经过时按按钮。",
+        "记录经过事件与按键时间，不暂停场景等待模型推理。"
+      ],
+      "conditions": [
+        {
+          "id": "slow",
+          "label": "较宽窗口",
+          "change": "使用预实验确认的较宽按键窗口。"
+        },
+        {
+          "id": "fast",
+          "label": "较窄窗口",
+          "change": "只改变速度或时间窗口，轨迹与目标次数保持一致。"
+        }
+      ],
+      "success": [
+        "事件次数正确，且按键发生在预设时间窗口内。"
+      ],
+      "metrics": [
+        "完整回合 SR",
+        "计数正确率",
+        "按键时机误差"
+      ],
+      "failures": [
+        "计数错误",
+        "过早按键",
+        "过晚按键",
+        "按钮执行失败"
+      ],
+      "benchmark": [
+        "StopCube"
+      ],
+      "designNotes": [
+        "外部控制器若替模型计数或触发动作，需作为不同系统单独报告。",
+        "此项是能力边界，不因核心方案未实现而声称覆盖。"
+      ],
+      "targetPerCondition": 20,
+      "preparation": [
+        {
+          "id": "hardware",
+          "label": "道具、标定与控制器就绪",
+          "done": false
+        },
+        {
+          "id": "development",
+          "label": "独立预实验完成",
+          "done": false
+        },
+        {
+          "id": "frozen",
+          "label": "提示、配置与评分规则冻结",
+          "done": false
+        },
+        {
+          "id": "evaluation",
+          "label": "配对正式测试完成",
+          "done": false
+        },
+        {
+          "id": "review",
+          "label": "结果与视频核对完成",
+          "done": false
+        }
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "suite": "Counting",
+      "benchmark": "BinFill",
+      "tasks": [
+        "T1"
+      ],
+      "level": "partial",
+      "note": "累计与多颜色计数已设计；传送带动态供料尚未实现。"
+    },
+    {
+      "suite": "Counting",
+      "benchmark": "PickXtimes",
+      "tasks": [
+        "T1"
+      ],
+      "level": "partial",
+      "note": "成功事件计数可对应；重复取放和移动目标需额外条件。"
+    },
+    {
+      "suite": "Counting",
+      "benchmark": "SwingXtimes",
+      "tasks": [],
+      "level": "gap",
+      "note": "左右起始方向、摆动周期与目标躲避尚未单独设计。"
+    },
+    {
+      "suite": "Counting",
+      "benchmark": "StopCube",
+      "tasks": [
+        "T8"
+      ],
+      "level": "boundary",
+      "note": "可选实时边界任务，需真实时间执行。"
+    },
+    {
+      "suite": "Permanence",
+      "benchmark": "VideoUnmask",
+      "tasks": [
+        "T2"
+      ],
+      "level": "mapped",
+      "note": "隐藏关联、按序揭盖与局部遮挡。"
+    },
+    {
+      "suite": "Permanence",
+      "benchmark": "ButtonUnmask",
+      "tasks": [
+        "T2"
+      ],
+      "level": "partial",
+      "note": "揭盖与遮挡已设计；按钮触发短暂揭示需新增。"
+    },
+    {
+      "suite": "Permanence",
+      "benchmark": "VideoUnmaskSwap",
+      "tasks": [
+        "T2",
+        "T7"
+      ],
+      "level": "mapped",
+      "note": "连续运动关联与旧记忆更新。"
+    },
+    {
+      "suite": "Permanence",
+      "benchmark": "ButtonUnmaskSwap",
+      "tasks": [
+        "T2",
+        "T7"
+      ],
+      "level": "partial",
+      "note": "连续更新可对应；双按钮状态与运动中交互需新增。"
+    },
+    {
+      "suite": "Reference",
+      "benchmark": "PickHighlight",
+      "tasks": [
+        "T3"
+      ],
+      "level": "partial",
+      "note": "历史对象集合已设计；短暂高亮与局部集群运动需新增。"
+    },
+    {
+      "suite": "Reference",
+      "benchmark": "VideoRepick",
+      "tasks": [
+        "T3"
+      ],
+      "level": "partial",
+      "note": "历史身份与运动可对应；重复次数及形状变体需独立条件。"
+    },
+    {
+      "suite": "Reference",
+      "benchmark": "VideoPlaceButton",
+      "tasks": [
+        "T4"
+      ],
+      "level": "mapped",
+      "note": "事件与对象绑定、托盘身份更新。"
+    },
+    {
+      "suite": "Reference",
+      "benchmark": "VideoPlaceOrder",
+      "tasks": [
+        "T4"
+      ],
+      "level": "mapped",
+      "note": "第 k 次事件检索与托盘位置变化。"
+    },
+    {
+      "suite": "Imitation",
+      "benchmark": "MoveCube",
+      "tasks": [
+        "T6"
+      ],
+      "level": "partial",
+      "note": "仅评估实际实现的工具方法与有限尝试。"
+    },
+    {
+      "suite": "Imitation",
+      "benchmark": "InsertPeg",
+      "tasks": [],
+      "level": "gap",
+      "note": "抓取端、插入侧与精密对齐尚未设计。"
+    },
+    {
+      "suite": "Imitation",
+      "benchmark": "PatternLock",
+      "tasks": [
+        "T5"
+      ],
+      "level": "mapped",
+      "note": "顺序复现与网格几何变化；工具挂载变化另测。"
+    },
+    {
+      "suite": "Imitation",
+      "benchmark": "RouteStick",
+      "tasks": [
+        "T5"
+      ],
+      "level": "partial",
+      "note": "绕障作为扩展条件；动态障碍尚未实现。"
+    }
+  ],
+  "protocol": [
+    {
+      "title": "共享控制与观测",
+      "body": "固定相机、分辨率、原始采样、动作接口、执行长度、重规划与运动反馈。短期历史 / 全历史 / harness 的差异明确记录。"
+    },
+    {
+      "title": "配对场景与随机顺序",
+      "body": "预先生成场景清单，各方法按同一清单独立复位执行。方法顺序随机；重复同一场景时记录重复编号。"
+    },
+    {
+      "title": "开发与正式测试分离",
+      "body": "用独立预实验确定参数、提示和评分规则，正式测试前冻结。测试示范属于任务输入，不自动等同于训练或适配数据。"
+    },
+    {
+      "title": "完成与失败规则",
+      "body": "预定人工事件属于任务；额外提示、代抓或扶正记为人工干预，不能计作自主成功。无效回合仅按预注册的排除规则认定并保留理由。"
+    },
+    {
+      "title": "记忆隔离与评分真值",
+      "body": "每个独立 episode 清空任务记忆。隐藏位置、对象身份和事件标签只用于评分，不注入策略。"
+    },
+    {
+      "title": "预算、成本与统计单位",
+      "body": "统一每回合动作与推理预算上限，另报实际 token、模型调用和记忆维护开销。区分独立场景、重复执行和尝试次数。"
+    },
+    {
+      "title": "覆盖范围与能力边界",
+      "body": "覆盖矩阵只表示当前任务设计的对应关系。仿真完整基准、真实硬件执行和离线决策诊断分别报告；不把计划或离线结果写成真机成功。"
+    }
+  ],
+  "metrics": [
+    {
+      "name": "任务成功率 SR",
+      "definition": "完整满足任务要求的自主成功回合数 / 有效正式测试执行数。"
+    },
+    {
+      "name": "首次目标与顺序",
+      "definition": "从记录中的可评分字段统计目标选择与操作顺序正确率。"
+    },
+    {
+      "name": "旧记忆错误",
+      "definition": "状态改变后仍按旧记录行动；T7 的变化与未变化条件分别报告。"
+    },
+    {
+      "name": "时间与开销",
+      "definition": "总时长、推理等待和运动时长分别记录；所有尝试的 token 与记忆维护成本均保留。"
+    },
+    {
+      "name": "配对差异",
+      "definition": "主要比较 Ours 与 Astra-History。在相同场景条件下分析差异；重复场景需按场景聚类处理。"
+    }
+  ],
+  "sources": [
+    {
+      "title": "RoboMME-Plus · 任务与评测",
+      "url": "https://robomme.github.io/plus.html",
+      "note": "16 项仿真任务、800 个固定测试回合；真机方案不等同于官方复刻。"
+    },
+    {
+      "title": "RoboMME-Plus · 设计说明",
+      "url": "https://robomme.github.io/blog/",
+      "note": "数量、连续运动、遮挡与有限纠错等挑战。"
+    },
+    {
+      "title": "Astranomy · Astra 控制接口",
+      "url": "https://research.nvidia.com/labs/srl/projects/astranomy/index.html",
+      "note": "短期 Direct 与持久历史 Agentic 设置；本方案统一执行设置后比较。"
+    },
+    {
+      "title": "RoboMME · 原论文",
+      "url": "https://arxiv.org/html/2603.04639v1#A4",
+      "note": "原真机任务 PutFruits / TrackCube / RepickBlock / DrawPattern。"
+    }
+  ],
+  "trials": []
+}

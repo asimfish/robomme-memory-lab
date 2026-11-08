@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f7f2">
+  <meta name="description" content="Franka + Astra 记忆 harness 实验看板：任务方案、RoboMME-Plus 能力对应、进度与可维护结果记录。">
+  <title>Astra Memory Lab · 真机实验看板</title>
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <aside class="sidebar">
+    <a class="brand" href="#overview" aria-label="Astra Memory Lab 首页"><span class="brand-mark" aria-hidden="true">m<span>·</span></span><span>MEMORY LAB<small>ASTRA × FRANKA</small></span></a>
+    <div class="sidebar-label">RESEARCH WORKSPACE</div>
+    <nav aria-label="主要导航">
+      <a href="#overview" data-route="overview"><span class="nav-icon">◫</span>实验总览</a>
+      <a href="#tasks" data-route="tasks"><span class="nav-icon">▤</span>任务与进度<span class="nav-count">08</span></a>
+      <a href="#coverage" data-route="coverage"><span class="nav-icon">▦</span>能力覆盖</a>
+      <a href="#results" data-route="results"><span class="nav-icon">↗</span>实验结果</a>
+      <a href="#protocol" data-route="protocol"><span class="nav-icon">≡</span>评测协议</a>
+      <a href="#maintain" data-route="maintain"><span class="nav-icon">⚙</span>维护与导出</a>
+    </nav>
+    <div class="sidebar-bottom"><span class="small-dot"></span><strong id="sidebar-phase">实验设计阶段</strong><p>从记住信息，到正确行动。</p><a id="repository-link" class="repo-link" href="#maintain">配置 GitHub 仓库 ↗</a><div class="version-label" id="version-label">PLAN v0.1.0</div></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><div><span class="breadcrumb">Franka 真机实验</span><span class="top-separator">/</span><strong id="page-name">实验总览</strong></div><div class="top-actions"><span id="draft-indicator" class="draft-indicator">仓库版本</span><button type="button" class="button small secondary" data-action="export">导出数据 <span aria-hidden="true">↗</span></button></div></header>
+    <main id="main" tabindex="-1"><div class="loading-state"><span class="small-dot"></span>正在加载实验方案…</div></main>
+    <footer class="site-footer"><span>Astra Memory Lab <span class="footer-dot">·</span> 实验设计与记录</span><span>计划与实测分开呈现 <span class="footer-dot">/</span> <span id="updated-date"></span></span></footer>
+  </div>
+  <dialog id="trial-dialog" aria-labelledby="trial-title">
+    <div class="dialog-heading"><div><span class="eyebrow">EXPERIMENT LOG</span><h2 id="trial-title">记录一次执行</h2></div><button class="icon-button" type="button" data-action="close-dialog" aria-label="关闭记录窗口">×</button></div>
+    <form id="trial-form"><div id="trial-fields"></div><div class="form-error" id="trial-error" role="alert"></div><div class="dialog-actions"><p>保存在本机草稿，导出后提交到仓库即可共享。</p><button type="submit" class="button primary">保存记录</button></div></form>
+  </dialog>
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title"><h2 id="confirm-title">恢复仓库中的版本？</h2><p>当前浏览器的本机草稿会被清除。先导出数据可以保留这些修改。</p><div class="dialog-actions"><button class="button secondary" data-action="cancel-reset">保留草稿</button><button class="button primary" data-action="confirm-reset">恢复仓库版本</button></div></dialog>
+  <input id="import-file" type="file" accept=".json,application/json" hidden>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
