@@ -8,7 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const project = validateProject(JSON.parse(readFileSync(resolve(root, 'site/data/project.json'), 'utf8')));
 const html = readFileSync(resolve(root, 'site/index.html'), 'utf8');
 for (const match of html.matchAll(/(?:src|href)="(\.\/[^"#]+)"/g)) {
-  if (!existsSync(resolve(root, 'site', match[1]))) throw new Error('Missing asset: ' + match[1]);
+  if (!existsSync(resolve(root, 'site', match[1].split('?')[0]))) throw new Error('Missing asset: ' + match[1]);
 }
 for (const script of ['site/app.js', 'site/model.js']) execFileSync(process.execPath, ['--check', resolve(root, script)]);
 for (const path of ['site/styles.css', 'site/.nojekyll', '.github/workflows/pages.yml']) {

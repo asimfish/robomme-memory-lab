@@ -1,4 +1,4 @@
-import { STATUS, OUTCOME, COVERAGE, escapeHtml as e, safeUrl, validateProject, statistics, toCsv, planWorkload } from './model.js';
+import { STATUS, OUTCOME, COVERAGE, escapeHtml as e, safeUrl, validateProject, statistics, toCsv, planWorkload } from './model.js?v=0.2.0';
 
 const main = document.querySelector('#main');
 const storageKey = 'astra-memory-lab:v1:' + location.pathname.replace(/index\.html$/, '');
