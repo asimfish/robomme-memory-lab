@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validateProject, statistics, wilson, toCsv, safeUrl, escapeHtml } from '../site/model.js';
+import { validateProject, statistics, wilson, toCsv, safeUrl, escapeHtml, planWorkload } from '../site/model.js';
 
 const source = JSON.parse(readFileSync(new URL('../site/data/project.json', import.meta.url)));
 const fresh = () => ({ ...structuredClone(source), trials: [] });
@@ -95,4 +95,31 @@ test('all benchmark mapping references and phase/status enums remain valid on im
   assert.throws(() => validateProject(p), /状态无效/);
   p = fresh(); p.schemaVersion = 2;
   assert.throws(() => validateProject(p), /数据版本/);
+});
+
+test('the workload counts scenes per task rather than multiplying them by condition count', () => {
+  const s = planWorkload(source, 10, ['direct', 'history', 'ours']);
+  const core = source.tasks.filter(t => t.priority === '核心');
+  assert.equal(s.episodes, core.length * 10 * 3);
+  assert.equal(s.independentScenes, core.length * 10);
+  for (const task of s.allocations) assert.equal(task.conditions.reduce((sum, c) => sum + c.scenes, 0), 10);
+  assert.equal(s.demoClips, core.filter(t => t.operations?.requiresDemo).length * 10);
+  assert.equal(planWorkload(source, 10, ['history', 'ours']).episodes, core.length * 10 * 2);
+  assert.equal(planWorkload(source, 20).episodes, core.length * 20 * source.planning.methodIds.length);
+  assert.equal(planWorkload(source, 0), null);
+  assert.equal(planWorkload(source, 10, ['ours', 'ours']), null);
+});
+
+test('operator metadata accepts missing measurements and validates recorded preparation times', () => {
+  const p = fresh();
+  p.trials = [record('operator-a', { demoId: 'DEMO-001', setupSec: 12.5, resetSec: 9, resetVerified: true })];
+  assert.doesNotThrow(() => validateProject(p));
+  p.trials[0].setupSec = -1;
+  assert.throws(() => validateProject(p), /setupSec/);
+  p.trials[0].setupSec = null;
+  p.trials[0].resetVerified = 'yes';
+  assert.throws(() => validateProject(p), /复位核对/);
+  p.trials[0].resetVerified = null;
+  assert.doesNotThrow(() => validateProject(p));
+  assert.ok(toCsv(p.trials).includes('"demoId","resetVerified","setupSec","resetSec"'));
 });

@@ -69,8 +69,30 @@ export function validateProject(p) {
       if (!obj(x) || !/^[a-z][a-z0-9-]*$/.test(x.id) || typeof x.done !== 'boolean') fail('准备项无效');
       str(x.label, '准备项名称');
     });
+    if (t.operations != null) {
+      if (!obj(t.operations) || typeof t.operations.requiresDemo !== 'boolean') fail('人工操作设置无效');
+      str(t.operations.mode, '人工操作模式');
+      str(t.operations.duringExecution, '执行期人工操作');
+      for (const key of ['humanBefore', 'reset', 'consistency']) textArray(t.operations[key], 'operations.' + key);
+    }
   });
   const taskMap = new Map(p.tasks.map(t => [t.id, t]));
+  if (p.planning != null) {
+    if (!obj(p.planning)) fail('场景预算设置无效');
+    number(p.planning.scenesPerTask, '每类独立场景数', true, false);
+    number(p.planning.extendedScenesPerTask, '扩展场景数', true, false);
+    if (p.planning.scenesPerTask < 2 || p.planning.extendedScenesPerTask < 2) fail('每类至少两个独立场景');
+    if (!Array.isArray(p.planning.methodIds) || !p.planning.methodIds.length || p.planning.methodIds.some(id => !methodIds.has(id))) fail('预算引用了未知方法');
+    unique(p.planning.methodIds, '预算方法');
+    str(p.planning.note, '预算说明');
+  }
+  if (p.operatorWorkflow != null) {
+    if (!Array.isArray(p.operatorWorkflow)) fail('人工操作流程无效');
+    p.operatorWorkflow.forEach(x => {
+      if (!obj(x)) fail('人工操作步骤无效');
+      str(x.title, '操作步骤标题'); str(x.body, '操作步骤说明');
+    });
+  }
   if (!Array.isArray(p.coverage) || p.coverage.length !== 16) fail('覆盖矩阵需要保留全部 16 项基准任务');
   unique(p.coverage.map(c => c.benchmark), '基准任务');
   p.coverage.forEach(c => {
@@ -99,6 +121,9 @@ export function validateProject(p) {
     number(t.repeatIndex, '重复编号', true, false);
     if (t.repeatIndex < 1) fail('重复编号从 1 开始');
     for (const f of ['durationSec', 'inferenceSec', 'motionSec']) number(t[f], f);
+    for (const f of ['setupSec', 'resetSec']) if (t[f] !== undefined) number(t[f], f);
+    if (t.demoId !== undefined) str(t.demoId, '示范 ID');
+    if (t.resetVerified != null && typeof t.resetVerified !== 'boolean') fail('复位核对必须为布尔值或 null');
     number(t.tokens, 'tokens', true);
     for (const f of ['targetCorrect', 'orderCorrect', 'staleMemoryUsed']) {
       if (t[f] != null && typeof t[f] !== 'boolean') fail(f + ' 应为布尔值或 null');
@@ -140,11 +165,32 @@ export function statistics(trials) {
 }
 
 export function toCsv(rows) {
-  const keys = ['id', 'taskId', 'conditionId', 'methodId', 'scenarioId', 'repeatIndex', 'phase', 'outcome', 'durationSec', 'inferenceSec', 'motionSec', 'tokens', 'targetCorrect', 'orderCorrect', 'staleMemoryUsed', 'failureTags', 'modelVersion', 'configRevision', 'notes', 'videoUrl', 'createdAt'];
+  const keys = ['id', 'taskId', 'conditionId', 'methodId', 'scenarioId', 'repeatIndex', 'phase', 'outcome', 'demoId', 'resetVerified', 'setupSec', 'resetSec', 'durationSec', 'inferenceSec', 'motionSec', 'tokens', 'targetCorrect', 'orderCorrect', 'staleMemoryUsed', 'failureTags', 'modelVersion', 'configRevision', 'notes', 'videoUrl', 'createdAt'];
   const cell = v => {
     let value = Array.isArray(v) ? v.join(' / ') : String(v ?? '');
     if (/^[=+\-@\t\r]/.test(value)) value = "'" + value;
     return '"' + value.replaceAll('"', '""') + '"';
   };
   return '\uFEFF' + [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\r\n');
+}
+
+export function planWorkload(project, scenesPerTask, methodIds) {
+  const tasks = project.tasks.filter(t => t.priority === '核心');
+  const selected = methodIds || project.planning?.methodIds || ['direct', 'history', 'ours'];
+  const known = new Set(project.methods.map(m => m.id));
+  if (!Number.isInteger(scenesPerTask) || scenesPerTask < 2 || !selected.length || new Set(selected).size !== selected.length || selected.some(id => !known.has(id))) return null;
+  const allocations = tasks.map(t => {
+    const conditions = t.conditions.slice(0, 2);
+    return {
+      taskId: t.id,
+      conditions: conditions.map((c, i) => ({ conditionId: c.id, scenes: Math.floor(scenesPerTask / conditions.length) + (i < scenesPerTask % conditions.length ? 1 : 0) }))
+    };
+  });
+  return {
+    tasks: tasks.length, scenesPerTask, methods: selected.length,
+    independentScenes: tasks.length * scenesPerTask,
+    episodes: tasks.length * scenesPerTask * selected.length,
+    demoClips: tasks.filter(t => t.operations?.requiresDemo).length * scenesPerTask,
+    allocations
+  };
 }
