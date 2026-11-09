@@ -1,11 +1,11 @@
-import { STATUS, OUTCOME, COVERAGE, escapeHtml as e, safeUrl, validateProject, statistics, toCsv, planWorkload } from './model.js?v=0.3.0';
+import { STATUS, OUTCOME, COVERAGE, escapeHtml as e, safeUrl, validateProject, statistics, toCsv, planWorkload } from './model.js?v=0.4.0';
 
 const main = document.querySelector('#main');
 const storageKey = 'astra-memory-lab:v1:' + location.pathname.replace(/index\.html$/, '');
 let project, repositoryProject, repositoryFingerprint, draftBaseFingerprint, dirty = false, stale = false, saved = true;
 let taskSearch = '', suiteFilter = '', statusFilter = '', coverageFilter = '', resultTask = '', logOutcome = '', logMethod = '';
 let editingTrial = null, toastTimer, openTasks = new Set(), page = 'overview', activeTask = '';
-const names = { overview: '实验总览', method: 'FDS 方法对齐', tasks: '任务与进度', coverage: '能力覆盖', results: '实验结果', protocol: '评测协议', maintain: '维护与导出' };
+const names = { overview: '研究方案', method: 'FDS 方法对齐', tasks: '任务与进度', coverage: '能力覆盖', results: '实验结果', protocol: '评测协议', maintain: '维护与导出' };
 const fingerprint = value => {
   const text = JSON.stringify(value);
   let hash = 2166136261;
@@ -13,12 +13,10 @@ const fingerprint = value => {
   return (hash >>> 0).toString(16);
 };
 const options = (items, selected = '') => items.map(([value, label]) => '<option value="' + e(value) + '"' + (value === selected ? ' selected' : '') + '>' + e(label) + '</option>').join('');
-const status = task => '<span class="status-tag ' + e(task.status) + '">' + e(STATUS[task.status]) + '</span>';
 const list = (items, ordered = false) => '<' + (ordered ? 'ol' : 'ul') + '>' + items.map(x => '<li>' + e(x) + '</li>').join('') + '</' + (ordered ? 'ol' : 'ul') + '>';
 const button = (action, label, style = 'secondary') => '<button class="button ' + style + '" type="button" data-action="' + action + '">' + label + '</button>';
 const intro = (kicker, title, description) => '<div class="page-intro"><span class="eyebrow">' + kicker + '</span><h1>' + title + '</h1><p>' + description + '</p></div>';
 const section = (index, title, description = '', right = '') => '<div class="section-heading"><div><h2><span class="section-index">' + index + '</span>' + title + '</h2>' + (description ? '<p>' + description + '</p>' : '') + '</div>' + right + '</div>';
-const stat = (label, value, note, unit = '') => '<div class="stat-card"><div class="label">' + label + '<span aria-hidden="true">↗</span></div><div class="stat-value">' + value + (unit ? '<small>' + unit + '</small>' : '') + '</div><div class="stat-note">' + note + '</div></div>';
 const taskLinks = ids => ids.map(id => '<a class="task-link" href="#tasks/' + e(id) + '">' + e(id) + '</a>').join('');
 
 function toast(message) {
@@ -33,7 +31,6 @@ function updateChrome() {
   document.querySelector('#version-label').textContent = 'PLAN v' + project.meta.version;
   document.querySelector('#sidebar-phase').textContent = project.meta.phase;
   document.querySelector('#updated-date').textContent = '更新于 ' + project.meta.updatedAt;
-  document.querySelector('.nav-count').textContent = String(project.tasks.length).padStart(2, '0');
   const indicator = document.querySelector('#draft-indicator');
   indicator.textContent = !saved ? '草稿未持久保存 · 请导出' : dirty ? (stale ? '本机草稿 · 仓库已更新' : '本机草稿已保存') : '仓库版本';
   indicator.classList.toggle('dirty', dirty);
@@ -65,28 +62,48 @@ function mutate(change, redraw = true) {
 }
 
 function sourceCards() {
-  return '<div class="source-grid">' + project.sources.map(s => '<a class="source-card" href="' + e(safeUrl(s.url)) + '" target="_blank" rel="noopener noreferrer"><strong>' + e(s.title) + '<span aria-hidden="true">↗</span></strong><p>' + e(s.note) + '</p></a>').join('') + '</div>';
+  return '<ol class="reference-list">' + project.sources.map(s => '<li><a href="' + e(safeUrl(s.url)) + '" target="_blank" rel="noopener noreferrer">' + e(s.title) + ' ↗</a><p>' + e(s.note) + '</p></li>').join('') + '</ol>';
 }
 
 function methods(cardsOnly = false) {
-  const mainMethods = project.methods.filter(m => ['direct', 'history', 'contract-off', 'ours'].includes(m.id));
-  const cards = '<div class="method-grid">' + mainMethods.map(m => '<article class="method-card ' + (m.kind === 'ours' ? 'ours' : '') + '"><div class="method-label">' + (m.kind === 'ours' ? 'OUR SYSTEM' : 'BASELINE / ' + e(m.id.toUpperCase())) + '</div><h3>' + e(m.name) + '</h3><p>' + e(m.description) + '</p><small>' + e(m.control) + '</small></article>').join('') + '</div>';
-  return cards + (cardsOnly ? '' : '<div class="notice">主要比较：同版本 Task Harness F0 vs F1。Astra-Direct 为可选系统参考；Memory、Skill 与 RSI 的独立贡献需要另外的受控实验。</div>');
+  const rows = project.methods.filter(m => ['contract-off', 'ours', 'direct', 'history'].includes(m.id));
+  return '<div class="table-panel"><table class="data-table method-table"><thead><tr><th>设置</th><th>比较内容</th><th>用途</th></tr></thead><tbody>' + rows.map(m => '<tr><td><strong>' + e(m.name) + '</strong></td><td><p>' + e(m.description) + '</p><small>' + e(m.control) + '</small></td><td>' + (m.id === 'direct' ? '可选系统参考' : '主要对照') + '</td></tr>').join('') + '</tbody></table></div>' + (cardsOnly ? '' : '<p class="caption">F0 / F1 隔离决策契约的影响。Astra-Direct 用于系统整体比较；Memory、Skill 与 RSI 的独立贡献需要另外的受控实验。</p>');
+}
+
+const chapterLinks = [
+  ['study-overview', '概览'], ['study-method', '1. 方法与对照'], ['study-tasks', '2. 四类真机实验'],
+  ['study-operation', '3. 人工操作与评测'], ['study-coverage', '4. 能力覆盖与边界'],
+  ['study-results', '5. 实验结果'], ['study-references', '参考资料']
+];
+
+function taskDiagram(id) {
+  const diagrams = {
+    T1: '<rect x="58" y="86" width="72" height="8" rx="2" class="svg-pad"/><rect x="80" y="62" width="28" height="24" rx="2" class="svg-block"/><path d="M58 67C22 30 74 6 116 28M116 28l-15-1m15 1-5-13M126 44c37 38-11 69-57 46M69 90l15 1m-15-1 5 13" class="svg-path"/><text x="94" y="128">实际完成 → 计数 +1</text>',
+    T2: '<path d="M40 54Q70 2 130 47" class="svg-path dashed"/><path d="M130 47l-12-4m12 4-2-13" class="svg-path"/><rect x="18" y="62" width="32" height="32" rx="3" class="svg-box"/><rect x="59" y="62" width="32" height="32" rx="3" class="svg-box"/><rect x="100" y="62" width="32" height="32" rx="3" class="svg-box"/><rect x="141" y="62" width="32" height="32" rx="3" class="svg-box"/><circle cx="116" cy="77" r="7" class="svg-block"/><path d="M14 59h40m1 0h40m1 0h40m1 0h40" class="svg-path"/><text x="94" y="128">新证据 → 更新位置</text>',
+    T3: '<path d="M18 60h156" class="svg-path"/><path d="M67 60V22h26l-7 9 7 10H67" class="svg-path"/><circle cx="39" cy="60" r="6" class="svg-box"/><circle cx="105" cy="60" r="7" class="svg-block"/><circle cx="153" cy="60" r="6" class="svg-box"/><text x="39" y="86">之前</text><text x="105" y="86">首次</text><text x="153" y="86">之后</text><text x="94" y="128">翻牌后，首次真正释放</text>',
+    T4: '<path d="M51 21v72m43-72v72m43-72v72M51 21h86M51 57h86M51 93h86" class="svg-grid"/><path d="M51 93V21h86v72" class="svg-path"/>' + [[51,21],[94,21],[137,21],[51,57],[94,57],[137,57],[51,93],[94,93],[137,93]].map(([x,y])=>'<circle cx="'+x+'" cy="'+y+'" r="4" class="svg-node"/>').join('') + '<circle cx="51" cy="93" r="6" class="svg-block"/><text x="94" y="128">记住顺序，核对棒尖</text>'
+  };
+  return '<svg class="task-diagram" viewBox="0 0 190 144" role="img" aria-label="' + e(id) + ' 任务示意">' + (diagrams[id] || '') + '</svg>';
+}
+
+function summaryResults() {
+  const display = project.methods.filter(m => (project.planning?.methodIds || ['history', 'ours']).includes(m.id));
+  return '<div class="table-panel"><table class="data-table result-summary"><thead><tr><th>任务</th><th>条件</th>' + display.map(m => '<th>' + e(m.name) + '</th>').join('') + '</tr></thead><tbody>' + project.tasks.flatMap(t => t.conditions.map(c => '<tr><td>' + e(t.id) + '</td><td>' + e(c.label) + '</td>' + display.map(m => '<td>' + resultCell(project.trials.filter(r => r.taskId === t.id && r.conditionId === c.id && r.methodId === m.id), m.id === 'ours') + '</td>').join('') + '</tr>')).join('') + '</tbody></table></div>';
 }
 
 function renderOverview() {
-  const core = project.tasks.filter(t => t.priority === '核心');
-  const completed = project.tasks.filter(t => t.status === 'completed').length;
-  const testTrials = project.trials.filter(t => t.phase === 'test' && t.outcome !== 'invalid');
-  const ready = project.tasks.reduce((sum, t) => sum + t.preparation.filter(x => x.done).length, 0);
-  const total = project.tasks.reduce((sum, t) => sum + t.preparation.length, 0);
-  return '<section class="hero"><div class="hero-copy"><div class="hero-meta"><span class="eyebrow">EVIDENCE BEFORE ACTION</span><span class="chip orange">方案 v' + e(project.meta.version) + '</span></div><h1>让决策，<br>经得起<span>证据核对。</span></h1><p>基于 FDS 实际实现，在相同记忆与控制条件下，检验决策契约能否减少过早行动，并帮助系统发现和修正错误。</p><div class="hero-actions"><a class="button primary" href="#tasks">查看实验任务 <span aria-hidden="true">↗</span></a><a class="button secondary" href="#coverage">检查能力覆盖</a></div></div><div class="memory-visual" aria-label="记忆保存、历史检索和状态更新共同指导下一次行动"><div class="visual-top"><span>AN EPISODE OF MEMORY</span><span>OBSERVE → ACT</span></div><div class="memory-track"><div class="memory-node"><span aria-hidden="true">▧</span><strong>保存历史</strong><small>WRITE</small></div><span class="memory-arrow" aria-hidden="true">→</span><div class="memory-node"><span aria-hidden="true">⌕</span><strong>检查依据</strong><small>CHECK</small></div><span class="memory-arrow" aria-hidden="true">→</span><div class="memory-node"><span aria-hidden="true">↻</span><strong>依据反馈更新</strong><small>REVISE</small></div></div><div class="visual-bottom"><span>PAST OBSERVATIONS</span><span>NEXT CORRECT ACTION ↗</span></div></div></section>' +
-    '<div class="stat-grid">' + stat('核心任务', core.length, core.length === project.tasks.length ? '本轮只做四类代表性机制' : '另含 ' + (project.tasks.length - core.length) + ' 项可选能力边界') + stat('基准对应', '16', '覆盖矩阵逐项说明缺口', '项') + stat('任务完成', completed, ready + ' / ' + total + ' 项准备工作完成', '/ ' + project.tasks.length) + stat('正式执行', testTrials.length || '—', testTrials.length ? '按逐回合真实记录统计' : '尚未录入实验结果', testTrials.length ? '回合' : '') + '</div>' +
-    '<div class="overview-columns"><section class="panel"><div class="panel-title"><h3>本轮四类实验</h3><a href="#tasks">全部任务 ↗</a></div>' + project.tasks.filter(t => t.priority === '核心').map(t => '<a class="compact-task" href="#tasks/' + e(t.id) + '"><span class="task-number">' + e(t.id) + '</span><div class="compact-task-copy"><h4>' + e(t.title) + '</h4><p>' + e(t.suite) + ' · ' + e(t.englishTitle) + '</p></div>' + status(t) + '<span class="compact-arrow" aria-hidden="true">↗</span></a>').join('') + '</section><section class="focus-panel"><span class="eyebrow">THE CENTRAL COMPARISON</span><h3>固定记忆，检验 FDS 的额外收益</h3><p>把人工工作集中在示范录制、开局核对和停机复位。固定示范跨方法复用，机器人执行时无需人手同步移物。</p><div class="comparison-row"><strong>Task Harness · F0</strong><span>→</span><strong>+ FDS · F1</strong></div><ul class="focus-list"><li><span>01</span>准备行动前：依据是否足够支持当前选择？</li><li><span>02</span>失败或旧假设失效后：能否发现并修正？</li><li><span>03</span>效果提升：需要多少额外时间与 token？</li></ul></section></div>' +
-    section('01', '两组主对比，一组系统参考', '同一 FDS 提交，固定 memory、skills=[] 和无在线 RSI。') + methods(true) +
-    '<div class="notice"><strong>首轮规模：</strong>4 类 × 每类 10 个独立场景 × F0/F1 = 80 回合。可选 Astra-Direct 追加 40，总计 120。两个条件各 5 个场景；30 段示范跨方法复用，16 次独立 dev 执行另计。<a href="#method">查看实现依据与待接入项 ↗</a></div>' +
-    section('02', '研究依据', '官方定义与本项目方案分开记录。') + sourceCards() +
-    '<div class="notice">' + e(project.meta.notes) + ' 当前任务对应关系不表示已经完成真机验证。</div>';
+  const a = project.methodAlignment;
+  const workload = planWorkload(project, project.planning?.scenesPerTask || 10, project.planning?.methodIds || ['history', 'ours']);
+  const valid = project.trials.filter(t => t.phase === 'test' && t.outcome !== 'invalid');
+  return '<header class="paper-header"><div class="paper-breadcrumb">RESEARCH PLAN <span>/</span> ASTRA · FRANKA · ROBOMME-PLUS</div><p class="paper-meta">实验方案 v' + e(project.meta.version) + ' <span>·</span> ' + e(project.meta.updatedAt) + '</p><h1>FDS：面向 Franka 的记忆与决策实验</h1><p class="paper-subtitle">以四类真机任务，检验记忆、证据核对与错误修正如何影响 Astra 的行动。</p><p class="paper-stage">' + e(project.meta.phase) + '</p><div class="resource-links"><a href="#study-tasks">四类实验</a><a href="' + e(safeUrl(a?.repository || project.meta.repositoryUrl)) + '" target="_blank" rel="noopener noreferrer">方法代码 ↗<small>需仓库权限</small></a><a href="https://robomme.github.io/plus.html" target="_blank" rel="noopener noreferrer">RoboMME-Plus ↗</a><a href="#results">实验记录</a></div></header>' +
+    '<div class="paper-layout"><nav class="paper-toc" aria-label="文章目录"><span>目录</span>' + chapterLinks.map(([id, title]) => '<a href="#' + id + '">' + title + '</a>').join('') + '</nav><article class="paper-body">' +
+    '<section id="study-overview" class="paper-section"><div class="key-points"><h2>本轮实验要回答什么</h2><ul><li><strong>记忆正确，是否就足够？</strong>固定同一套记忆与控制接口，比较 FDS 契约关闭（F0）与开启（F1）。</li><li><strong>证据不足时，系统会如何行动？</strong>观察是否过早决策、使用旧状态，以及失败后能否修正。</li><li><strong>真机上能否重复操作？</strong>只做四类任务，人手示范提前录制，执行期间不要求人工移物。</li></ul></div><h2>概览</h2><p>本方案将 RoboMME-Plus 中的代表性记忆机制落到 Franka 真机：完成事件计数、藏物位置更新、事件边界指代和轨迹顺序复现。重点是让历史信息影响一次可观察、可评分的真实行动。</p><p>首轮计划 <strong>' + (workload?.episodes || 80) + ' 次主对比</strong>：四类任务，每类 10 个独立场景，F0 / F1 配对执行；两个条件各 5 个场景。T2–T4 共用 30 段预录示范，16 次独立开发试跑另计。可选 Astra-Direct 追加 40 次执行。</p><p class="caption">本页是实验设计与记录文档。' + (valid.length ? '当前已有 ' + valid.length + ' 条有效正式执行记录。' : '当前没有真机实测结果，不能据此判断方法效果。') + '</p></section>' +
+    '<section id="study-method" class="paper-section"><h2>1. 方法与对照</h2><p>' + e(a?.positioning || '当前草稿尚未包含完整 FDS 方法对齐，请导出保留后恢复共享版本。') + '</p><figure class="method-figure"><div class="method-line"><span>观察与历史</span><i>→</i><span>显式记忆</span><i>→</i><span class="highlight">FDS 决策契约</span><i>→</i><span>动作与反馈</span></div><figcaption>方法结构示意。两组共享观察、记忆与控制；F1 额外检查决策依据，并依据反馈修正。</figcaption></figure>' + methods(true) + '<p>Host 检查格式、引用与声明之间的关系；合法引用仍可能包含错误判断。命令执行完毕，也不等于完成了物理任务。因此，契约校验和真实任务成功分别评分。</p><a class="read-more" href="#method">实现依据、off / full 配置与待接入项 →</a></section>' +
+    '<section id="study-tasks" class="paper-section"><h2>2. 四类真机实验</h2><p>每类只改变一个主要条件。以下为任务示意，展开可查看指令、评分规则、人工操作与准备进度。</p><div class="task-list paper-tasks">' + project.tasks.map(taskCard).join('') + '</div><p class="caption">示意图只说明任务结构，不代表真实场景或已完成的实验。</p></section>' +
+    '<section id="study-operation" class="paper-section"><h2>3. 人工操作与评测</h2><p>把人工工作集中到开局与回合之间：场务负责示范、摆放与复位，控制台负责启动、确认停稳与记录。T1 无需示范；T2–T4 将同一段视频提供给两种方法，再匹配视频终态进行真实执行。</p><ol class="workflow-list">' + (project.operatorWorkflow || []).map(p => '<li><h3>' + e(p.title) + '</h3><p>' + e(p.body) + '</p></li>').join('') + '</ol><p><strong>主要指标：</strong>配对场景下的自主成功率、首次终止错误、依据不足仍行动的比例、真实失败后的恢复，以及时间和 token 成本。人工布置、复位耗时单独记录。</p><a class="read-more" href="#protocol">查看统一协议、冻结设置和完整指标 →</a></section>' +
+    '<section id="study-coverage" class="paper-section"><h2>4. 能力覆盖与边界</h2><p>四类任务提供代表性机制证据，不能等同于完整复刻 RoboMME-Plus。仿真中的完整基准结论与真机上的机制结论分开报告。</p><div class="table-panel"><table class="data-table"><thead><tr><th>真机任务</th><th>主要检验</th><th>本轮边界</th></tr></thead><tbody><tr><td>T1 · 重复取放</td><td>完成事件计数</td><td>不评估实时按键与摆动周期。</td></tr><tr><td>T2 · 藏物追踪</td><td>位置更新、旧记忆失效</td><td>预录转移；不做执行期人手移物。</td></tr><tr><td>T3 · 事件指代</td><td>完成边界、翻牌后首次放置</td><td>不覆盖任意第 k 次事件查询。</td></tr><tr><td>T4 · 轨迹复现</td><td>节点顺序、执行进度与棒尖位置</td><td>固定网格；不含工具迁移或动态绕障。</td></tr></tbody></table></div><a class="read-more" href="#coverage">查看全部 16 项基准的对应关系与缺口 →</a></section>' +
+    '<section id="study-results" class="paper-section"><h2>5. 实验结果</h2><p>' + (valid.length ? '以下汇总正式执行记录。' : '实验尚未录入，所有条件保留为“待测”。') + '开发回合不计入成功率，人工干预计为非自主成功。配对差异需要按场景另外分析。</p>' + summaryResults() + '<p class="caption">表中显示成功率及成功数 / 有效执行数；仅独立场景显示 Wilson 区间。重复场景需聚类分析。</p><a class="read-more" href="#results">录入、核对或导出逐回合记录 →</a></section>' +
+    '<section id="study-references" class="paper-section"><h2>参考资料</h2>' + sourceCards() + '</section></article></div>';
 }
 
 
@@ -94,7 +111,7 @@ function renderMethod() {
   const a = project.methodAlignment;
   if (!a) return intro('METHOD ALIGNMENT', '当前草稿尚未包含 FDS 对齐。', '先导出旧草稿保存记录，再恢复共享方案查看新的方法依据。');
   const cards = rows => '<div class="protocol-grid">' + rows.map(x => '<article class="protocol-card"><span class="chip outline">' + e(x.status) + '</span><h3>' + e(x.title) + '</h3><p>' + e(x.body) + '</p>' + (x.source ? '<a class="task-link" href="' + e(safeUrl(x.source)) + '" target="_blank" rel="noopener noreferrer">固定提交中的实现 ↗</a>' : '') + '</article>').join('') + '</div>';
-  return intro('FDS × FRANKA', '从实际实现，定义要验证的贡献。', a.positioning) +
+  return intro('FDS × FRANKA', 'FDS 方法与实现依据', a.positioning) +
     '<div class="method-provenance"><span class="chip green">已核对代码</span><span>FDS <code>' + e(a.commit.slice(0, 7)) + '</code> · ' + e(a.reviewedAt) + '</span><a href="' + e(safeUrl(a.repository)) + '" target="_blank" rel="noopener noreferrer">方法仓库（需访问权限） ↗</a></div>' +
     '<div class="evidence-flow" aria-label="公开观察经过显式记忆、决策契约、真实行动和反馈更新形成闭环">' + ['公开观察', '显式记忆', '决策契约', '真实行动', '反馈与修正'].map((x, i) => '<div><small>0' + (i + 1) + '</small><strong>' + x + '</strong></div>').join('') + '</div>' +
     '<div class="notice orange"><strong>当前证据边界：</strong>host 核验格式、引用和声明之间的关系；合法证据引用不保证语义正确，命令完成不保证任务成功。Franka 适配仍需接入，页面尚无真实结果。</div>' +
@@ -110,15 +127,14 @@ function renderMethod() {
 function taskCard(t) {
   const done = t.preparation.filter(x => x.done).length;
   const opened = openTasks.has(t.id) || activeTask === t.id;
-  return '<article class="task-card" id="task-' + e(t.id) + '"><div class="task-card-top"><div class="task-card-kicker"><span class="task-number">' + e(t.id) + '</span><span class="chip">' + e(t.suite) + '</span><span class="chip ' + (t.priority === '核心' ? 'outline' : 'blue') + '">' + e(t.priority) + '</span></div><select id="status-' + e(t.id) + '" data-status="' + e(t.id) + '" aria-label="' + e(t.id) + ' 任务状态">' + options(Object.entries(STATUS), t.status) + '</select></div>' +
-    '<details data-task-details="' + e(t.id) + '"' + (opened ? ' open' : '') + '><summary><div><h3>' + e(t.title) + '</h3><span class="english">' + e(t.englishTitle) + '</span><p>' + e(t.purpose) + '</p></div><span class="expand-icon" aria-hidden="true">+</span></summary><div class="task-detail"><h4>任务指令 / PROMPT</h4><div class="prompt-box" lang="en">' + e(t.prompt) + '</div><div class="detail-grid">' +
+  return '<article class="task-card" id="task-' + e(t.id) + '"><details data-task-details="' + e(t.id) + '"' + (opened ? ' open' : '') + '><summary><div class="task-preview">' + taskDiagram(t.id) + '<div class="task-preview-copy"><span class="task-card-kicker">' + e(t.id) + ' <span> / </span>' + e(t.englishTitle) + '</span><h3>' + e(t.title) + '</h3><p>' + e(t.purpose) + '</p><div class="task-conditions">' + t.conditions.map(c => e(c.label)).join(' <span>vs.</span> ') + '</div><span class="task-open-label">流程与操作卡 <span aria-hidden="true">↓</span></span></div></div></summary><div class="task-detail"><h4>任务指令 / PROMPT</h4><div class="prompt-box" lang="en">' + e(t.prompt) + '</div><div class="detail-grid">' +
     '<div class="detail-block"><h4><span>01</span>场景与道具</h4>' + list(t.props) + '</div><div class="detail-block"><h4><span>02</span>执行流程</h4>' + list(t.steps, true) + '</div>' +
     '<div class="detail-block"><h4><span>03</span>测试条件 · 计划每条件 ' + e(t.targetPerCondition) + ' 个场景</h4><div class="condition-list">' + t.conditions.map((c, i) => '<div class="condition"><span class="chip ' + (i < 2 ? '' : 'blue') + '">' + (i < 2 ? '主条件' : '扩展 / 消融') + '</span><strong>' + e(c.label) + '</strong><p>' + e(c.change) + '</p></div>').join('') + '</div></div>' +
     '<div class="detail-block"><h4><span>04</span>成功判定</h4>' + list(t.success) + '<h4 style="margin-top:18px"><span>05</span>任务专属指标</h4>' + list(t.metrics) + '</div>' +
     '<div class="detail-block"><h4><span>06</span>失败标签</h4><div>' + t.failures.map(f => '<span class="chip outline" style="margin:0 5px 6px 0">' + e(f) + '</span>').join('') + '</div></div>' +
     '<div class="detail-block"><h4><span>07</span>设计与控制要点</h4>' + list(t.designNotes) + '</div></div>' +
     renderOperations(t) +
-    '<div class="task-edit-area"><h4>准备进度 <span class="text-muted">' + done + ' / ' + t.preparation.length + '</span></h4><div class="checklist">' + t.preparation.map(x => '<label><input id="prep-' + e(t.id) + '-' + e(x.id) + '" type="checkbox" data-prep-task="' + e(t.id) + '" data-prep-id="' + e(x.id) + '"' + (x.done ? ' checked' : '') + '>' + e(x.label) + '</label>').join('') + '</div><div class="task-note-fields"><label class="field"><span>负责人</span><input data-task-owner="' + e(t.id) + '" value="' + e(t.owner) + '" placeholder="待分配" maxlength="200"></label><label class="field"><span>实验备注 / 场景与视频链接</span><textarea data-task-notes="' + e(t.id) + '" placeholder="记录设置变化、待确认参数或视频链接…" maxlength="20000">' + e(t.notes) + '</textarea></label></div><div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px"><div class="text-muted" style="font-size:10px">对应仿真：' + e(t.benchmark.join(' / ')) + '</div><button class="button small secondary" data-action="record-task" data-task="' + e(t.id) + '">记录执行 ↗</button></div></div></div></details><div class="task-progress" aria-label="准备完成 ' + done + ' 项"><span style="width:' + (done / t.preparation.length * 100) + '%"></span></div></article>';
+    '<div class="task-edit-area"><div class="task-edit-heading"><h4>准备进度 <span class="text-muted">' + done + ' / ' + t.preparation.length + '</span></h4><select id="status-' + e(t.id) + '" data-status="' + e(t.id) + '" aria-label="' + e(t.id) + ' 任务状态">' + options(Object.entries(STATUS), t.status) + '</select></div><div class="checklist">' + t.preparation.map(x => '<label><input id="prep-' + e(t.id) + '-' + e(x.id) + '" type="checkbox" data-prep-task="' + e(t.id) + '" data-prep-id="' + e(x.id) + '"' + (x.done ? ' checked' : '') + '>' + e(x.label) + '</label>').join('') + '</div><div class="task-note-fields"><label class="field"><span>负责人</span><input data-task-owner="' + e(t.id) + '" value="' + e(t.owner) + '" placeholder="待分配" maxlength="200"></label><label class="field"><span>实验备注 / 场景与视频链接</span><textarea data-task-notes="' + e(t.id) + '" placeholder="记录设置变化、待确认参数或视频链接…" maxlength="20000">' + e(t.notes) + '</textarea></label></div><div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px"><div class="text-muted" style="font-size:10px">对应仿真：' + e(t.benchmark.join(' / ')) + '</div><button class="button small secondary" data-action="record-task" data-task="' + e(t.id) + '">记录执行 ↗</button></div></div></div></details><div class="task-progress" aria-label="准备完成 ' + done + ' 项"><span style="width:' + (done / t.preparation.length * 100) + '%"></span></div></article>';
 }
 
 function renderOperations(t) {
@@ -129,7 +145,7 @@ function renderOperations(t) {
 
 function renderTasks() {
   const suites = [...new Set(project.tasks.map(t => t.suite))];
-  return intro('TASKS & PROGRESS', '把能力拆成可执行的实验。', '本轮只保留四类。展开任务可查看人工准备、机器人执行期分工和回合后复位；执行过程中不要求人同步移动目标。') +
+  return intro('TASKS & PROGRESS', '四类任务与操作卡', '本轮只保留四类。展开任务可查看人工准备、机器人执行期分工和回合后复位；执行过程中不要求人同步移动目标。') +
     '<div class="toolbar"><label class="search-wrap"><span aria-hidden="true">⌕</span><input id="task-search" type="search" value="' + e(taskSearch) + '" placeholder="搜索任务、能力或仿真名称…" aria-label="搜索任务"></label><select id="suite-filter" aria-label="按能力筛选">' + options([['', '全部能力'], ...suites.map(s => [s, s])], suiteFilter) + '</select><select id="status-filter" aria-label="按状态筛选">' + options([['', '全部状态'], ...Object.entries(STATUS)], statusFilter) + '</select><span class="filter-summary" id="task-filter-summary"></span></div><div class="task-list" id="task-list"></div>';
 }
 
@@ -143,7 +159,7 @@ function refreshTasks() {
 function renderCoverage() {
   const counts = Object.fromEntries(Object.keys(COVERAGE).map(k => [k, project.coverage.filter(c => c.level === k).length]));
   const rows = project.coverage.filter(c => !coverageFilter || c.level === coverageFilter);
-  return intro('BENCHMARK COVERAGE', '四类记忆，逐项看清边界。', '对照 RoboMME-Plus 全部 16 项任务，标明当前设计的对应关系与缺口。任务映射不等同于完整复刻，更不表示已经取得实测结果。') +
+  return intro('BENCHMARK COVERAGE', 'RoboMME-Plus 能力覆盖', '对照 RoboMME-Plus 全部 16 项任务，标明当前设计的对应关系与缺口。任务映射不等同于完整复刻，更不表示已经取得实测结果。') +
     '<div class="coverage-summary">' + Object.entries(COVERAGE).map(([k, label]) => '<span><strong>' + counts[k] + '</strong>' + label + '</span>').join('') + '</div><div class="toolbar"><select id="coverage-filter" aria-label="筛选对应程度">' + options([['', '全部对应关系'], ...Object.entries(COVERAGE)], coverageFilter) + '</select><span class="filter-summary">方案对应关系 · 实测以实验结果页为准</span></div>' +
     '<div class="table-panel"><table class="data-table"><thead><tr><th>SUITE</th><th>RoboMME-Plus 任务</th><th>真机任务</th><th>设计对应</th><th>已覆盖的设计与剩余缺口</th></tr></thead><tbody>' + rows.map(c => '<tr><td class="coverage-suite">' + e(c.suite) + '</td><td class="mono">' + e(c.benchmark) + '</td><td>' + (taskLinks(c.tasks) || '<span class="text-muted">—</span>') + '</td><td><span class="chip coverage-' + e(c.level) + '">' + e(COVERAGE[c.level]) + '</span></td><td class="coverage-note">' + e(c.note) + '</td></tr>').join('') + '</tbody></table></div>' +
     '<div class="notice orange">本轮有意收敛：实时按键、摆动周期、可见物体高亮 / repick、滚球与工具迁移、精密插入和动态绕障未列入正式真机实验。矩阵保留这些缺口，不为凑齐 16 项增加操作负担。</div>' +
@@ -165,7 +181,6 @@ function filteredLogs() {
 function renderResults() {
   const valid = project.trials.filter(t => t.phase === 'test' && t.outcome !== 'invalid');
   const uniqueScenes = new Set(valid.map(t => JSON.stringify([t.taskId, t.conditionId, t.scenarioId])));
-  const testedTasks = new Set(valid.map(t => t.taskId));
   const methodIds = project.methods.filter(m => ['baseline', 'ours'].includes(m.kind) || project.trials.some(t => t.methodId === m.id)).map(m => m.id);
   const displayMethods = methodIds.map(id => project.methods.find(m => m.id === id)).filter(Boolean);
   const logs = filteredLogs();
@@ -174,9 +189,8 @@ function renderResults() {
     const records = project.trials.filter(r => r.taskId === t.id && r.conditionId === c.id);
     return '<tr><td><strong>' + e(t.id) + '</strong><small>' + e(t.title) + '</small></td><td>' + e(c.label) + '</td>' + displayMethods.map(m => '<td>' + resultCell(records.filter(r => r.methodId === m.id), m.id === 'ours') + '</td>').join('') + '</tr>';
   }));
-  return intro('EXPERIMENT RESULTS', '让每一个结果，都有记录可循。', '按任务与条件展示正式执行结果。开发回合不计入 SR，人工干预计为非自主成功；无效回合保留排除理由。') +
-    '<div class="stat-grid">' + stat('全部执行记录', project.trials.length, '包含开发、正式与无效回合') + stat('正式有效执行', valid.length, '成功 / 失败 / 人工干预') + stat('已记录场景', uniqueScenes.size, '按任务 × 条件 × 场景去重') + stat('已测试任务', testedTasks.size, '仅统计有效正式测试', '/ ' + project.tasks.length) + '</div>' +
-    (project.trials.length ? '' : '<div class="empty-state"><div class="empty-mark" aria-hidden="true">↗</div><h3>第一份实验结果，从这里开始。</h3><p>目前只保存实验方案，没有预填成功率。记录一次真实执行后，结果表会自动按条件汇总。</p>' + button('record', '记录一次执行', 'primary') + '</div>') +
+  return intro('EXPERIMENT RESULTS', '实验结果与执行记录', '按任务与条件展示正式执行结果。开发回合不计入 SR，人工干预计为非自主成功；无效回合保留排除理由。') +
+    '<p class="record-count">' + project.trials.length + ' 条执行记录 · ' + valid.length + ' 条有效正式执行 · ' + uniqueScenes.size + ' 个场景。' + (project.trials.length ? '' : '当前没有实测数据。') + '</p>' +
     section('01', '主结果表', '显示成功率、成功数 / 有效执行数；独立场景给出 95% Wilson 区间。', button('record', '+ 记录执行', 'primary')) +
     '<div class="toolbar"><select id="result-task" aria-label="筛选结果任务">' + options([['', '全部任务'], ...project.tasks.map(t => [t.id, t.id + ' · ' + t.title])], resultTask) + '</select><span class="filter-summary">主要对照：同版本 F0 vs F1</span></div>' +
     '<div class="table-panel"><table class="data-table"><thead><tr><th>任务</th><th>测试条件</th>' + displayMethods.map(m => '<th>' + e(m.name) + '</th>').join('') + '</tr></thead><tbody>' + tableRows.join('') + '</tbody></table></div>' +
@@ -194,7 +208,7 @@ function renderResults() {
 
 function renderProtocol() {
   const workflow = project.operatorWorkflow || [];
-  return intro('EVALUATION & HUMAN OPERATION', '先把人怎么做，写成可重复的流程。', '人工负责预录示范、开局核对和停机后复位。机器人执行时不再变化场景，不要求人和模型推理延迟同步。') +
+  return intro('EVALUATION & HUMAN OPERATION', '人工操作与统一评测协议', '人工负责预录示范、开局核对和停机后复位。机器人执行时不再变化场景，不要求人和模型推理延迟同步。') +
     section('01', '一轮实验的人工操作', '同一演示和终态跨方法复用；任务演示与额外救援分别记录。') +
     '<div class="protocol-grid">' + workflow.map((p, i) => '<article class="protocol-card"><div class="protocol-number">OPERATOR ' + String(i + 1).padStart(2, '0') + '</div><h3>' + e(p.title) + '</h3><p>' + e(p.body) + '</p></article>').join('') + '</div>' +
     section('02', '统一评测协议', '演示 ID、人工复位与机器人执行需要分别记录。') +
@@ -207,7 +221,7 @@ function renderProtocol() {
 function renderMaintain() {
   const repo = project.meta.repositoryUrl;
   const coreCount = project.tasks.filter(t => t.priority === '核心').length;
-  return intro('MAINTAIN THE WORKSPACE', '四类实验，把维护负担也降下来。', 'GitHub 中的 project.json 是团队共享版本。本机编辑后导出并提交，GitHub Pages 自动更新。') +
+  return intro('MAINTAIN THE WORKSPACE', '数据维护与导出', 'GitHub 中的 project.json 是团队共享版本。本机编辑后导出并提交，GitHub Pages 自动更新。') +
     '<div class="maintenance-grid"><section class="maintenance-card"><span class="eyebrow">LOCAL DRAFT → SHARED VERSION</span><h3 style="margin-top:10px">维护与发布</h3><p>编辑任务进度、复位备注和逐回合结果。导入文件整体替换本机草稿，不会直接修改 GitHub。</p><div class="maintenance-actions">' + button('export', '导出 project.json', 'primary') + button('import', '导入数据') + button('csv', '导出结果 CSV') + '</div><ol class="maintenance-steps"><li>编辑完成，点击<strong>导出 project.json</strong>。</li><li>替换 GitHub 的 <code>site/data/project.json</code> 并提交。</li><li>等待 Actions 验证和部署，再刷新共享版本。</li></ol>' +
     (repo ? '<a class="button small orange" style="margin-top:18px" href="' + e(repo + '/edit/main/site/data/project.json') + '" target="_blank" rel="noopener noreferrer">在 GitHub 编辑数据 ↗</a>' : '') +
     '<br><button class="danger-link" data-action="reset">恢复仓库版本，清除本机草稿</button></section>' +
@@ -241,7 +255,8 @@ function render() {
   rememberOpen();
   const focusId = document.activeElement?.id;
   const renderers = { overview: renderOverview, method: renderMethod, tasks: renderTasks, coverage: renderCoverage, results: renderResults, protocol: renderProtocol, maintain: renderMaintain };
-  main.innerHTML = (stale ? '<div class="notice orange stale-banner"><strong>共享方案已更新为 v' + e(repositoryProject.meta.version) + '（' + repositoryProject.tasks.length + ' 类）。</strong>当前显示的是旧本机草稿，请先导出保留，再恢复共享版本。 ' + button('reset', '恢复共享方案') + '</div>' : '') + renderers[page]();
+  main.classList.toggle('document-view', page === 'overview');
+  main.innerHTML = (page === 'overview' ? '' : '<a class="back-to-paper" href="#overview">← 返回研究方案</a>') + (stale ? '<div class="notice orange stale-banner"><strong>共享方案已更新为 v' + e(repositoryProject.meta.version) + '（' + repositoryProject.tasks.length + ' 类）。</strong>当前显示的是旧本机草稿，请先导出保留，再恢复共享版本。 ' + button('reset', '恢复共享方案') + '</div>' : '') + renderers[page]();
   if (page === 'tasks') refreshTasks();
   if (page === 'maintain') updateBudget();
   updateChrome();
@@ -253,18 +268,40 @@ function render() {
     if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
   if (focusId) document.getElementById(focusId)?.focus({ preventScroll: true });
+  observeChapters();
+}
+
+let chapterObserver;
+function observeChapters() {
+  chapterObserver?.disconnect();
+  if (page !== 'overview') return;
+  chapterObserver = new IntersectionObserver(entries => {
+    for (const entry of entries) if (entry.isIntersecting) {
+      document.querySelectorAll('.paper-toc a').forEach(a => {
+        const active = a.hash === '#' + entry.target.id;
+        a.classList.toggle('active', active);
+        if (active) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current');
+      });
+    }
+  }, { rootMargin: '-5% 0px -70% 0px' });
+  document.querySelectorAll('.paper-section').forEach(el => chapterObserver.observe(el));
 }
 
 function route() {
   const parts = location.hash.slice(1).split('/');
+  const chapter = chapterLinks.find(([id]) => id === parts[0])?.[0];
+  const previousPage = page;
   page = Object.hasOwn(names, parts[0]) ? parts[0] : 'overview';
   activeTask = page === 'tasks' && /^T[1-9][0-9]*$/.test(parts[1] || '') ? parts[1] : '';
   if (activeTask) {
     taskSearch = ''; suiteFilter = ''; statusFilter = '';
     openTasks.add(activeTask);
   }
-  render();
-  if (activeTask) requestAnimationFrame(() => document.querySelector('#task-' + activeTask)?.scrollIntoView({ block: 'start' }));
+  document.querySelector('.tools-menu').open = false;
+  // Same-document jumps preserve expanded tasks and in-progress fields.
+  if (!(chapter && previousPage === 'overview' && document.querySelector('#' + chapter))) render();
+  if (chapter) requestAnimationFrame(() => document.getElementById(chapter)?.scrollIntoView({ block: 'start', behavior: 'instant' }));
+  else if (activeTask) requestAnimationFrame(() => document.querySelector('#task-' + activeTask)?.scrollIntoView({ block: 'start', behavior: 'instant' }));
   else window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
@@ -381,6 +418,8 @@ document.addEventListener('change', event => {
 });
 
 document.addEventListener('click', event => {
+  if (event.target.closest('.skip-link')) { event.preventDefault(); main.focus(); main.scrollIntoView({ block: 'start' }); return; }
+  if (!event.target.closest('.tools-menu') || event.target.closest('.tools-menu a')) document.querySelector('.tools-menu').open = false;
   const edit = event.target.closest('[data-edit-trial]');
   if (edit) { showTrial('', project.trials.find(t => t.id === edit.dataset.editTrial)); return; }
   const actionButton = event.target.closest('[data-action]');
@@ -415,6 +454,11 @@ document.querySelector('#import-file').addEventListener('change', async event =>
     toast('已导入本机草稿，GitHub 仓库尚未改变。');
   } catch (error) { toast('导入失败：' + error.message); }
   event.target.value = '';
+});
+
+document.addEventListener('keydown', event => {
+  const menu = document.querySelector('.tools-menu');
+  if (event.key === 'Escape' && menu.open) { menu.open = false; menu.querySelector('summary').focus(); }
 });
 
 window.addEventListener('hashchange', route);

@@ -3,7 +3,7 @@
   "meta": {
     "title": "FDS × Franka Lab",
     "subtitle": "四类记忆任务 · 决策证据与纠错",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "updatedAt": "2026-11-09",
     "repositoryUrl": "https://github.com/asimfish/robomme-memory-lab",
     "phase": "FDS 对齐稿 · 待实机接入",
