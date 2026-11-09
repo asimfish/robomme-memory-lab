@@ -14,3 +14,18 @@ dialog{border:1px solid #dce2d2;border-radius:15px;background:#fbfcf8;color:var(
 .operator-card{margin-top:24px;padding:20px;border:1px solid #dbe5ce;border-radius:10px;background:#f5f8ef}.operator-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}.operator-heading h3{font-size:15px;margin-top:6px}.operator-heading .chip{white-space:normal;max-width:100%;line-height:1.7}.operator-card .notice{margin:18px 0}.task-card{scroll-margin-top:120px}.stale-banner .button{margin-left:8px;margin-top:5px}
 @media(max-width:560px){.operator-card{padding:16px 13px}.operator-heading h3{font-size:14px}}
 @media print{.sidebar,.topbar,.site-footer,.toolbar,.top-actions,.task-card-top select,.task-edit-area,.maintenance-actions,.button,.toast{display:none!important}.workspace{margin:0}#main{padding:0;max-width:none}.hero{grid-template-columns:1fr}.memory-visual{display:none}.task-card,.panel,.protocol-card{break-inside:avoid}.task-card details:not([open]) .task-detail{display:block}.data-table{min-width:0}.table-panel{overflow:visible}body{background:#fff;font-size:11px}}
+:root { --evidence-border: #d9ded0; }
+.method-provenance { display:flex; align-items:center; gap:12px; flex-wrap:wrap; color:var(--text-muted); font-size:12px; margin:0 0 20px; }
+.method-provenance a { margin-left:auto; }
+.evidence-flow { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:22px 0; }
+.evidence-flow > div { border:1px solid var(--evidence-border); border-radius:12px; background:#f0f2e9; padding:18px 14px; display:grid; gap:8px; }
+.evidence-flow small { color:#667249; font:500 11px ui-monospace,monospace; }
+.evidence-flow strong { font-size:14px; }
+.config-code { white-space:pre-wrap; overflow-wrap:anywhere; background:#f1f2ed; border:1px solid var(--evidence-border); border-radius:8px; padding:16px; font-size:13px; line-height:1.8; margin:16px 0; }
+.method-controls { margin-top:16px; }
+.method-controls ol { padding-left:22px; line-height:1.9; }
+.method-controls li + li { margin-top:10px; }
+.field-note { margin:0; font-size:12px; line-height:1.7; color:#65705b; }
+.protocol-card > .chip { align-self:flex-start; margin-bottom:12px; }
+.protocol-card > .task-link { display:inline-block; margin-top:12px; }
+@media (max-width:600px) { .evidence-flow { grid-template-columns:repeat(2,minmax(0,1fr)); } .evidence-flow > div:last-child { grid-column:1/-1; } .method-provenance a { margin-left:0; } }

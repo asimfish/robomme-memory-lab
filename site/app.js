@@ -1,11 +1,11 @@
-import { STATUS, OUTCOME, COVERAGE, escapeHtml as e, safeUrl, validateProject, statistics, toCsv, planWorkload } from './model.js?v=0.2.0';
+import { STATUS, OUTCOME, COVERAGE, escapeHtml as e, safeUrl, validateProject, statistics, toCsv, planWorkload } from './model.js?v=0.3.0';
 
 const main = document.querySelector('#main');
 const storageKey = 'astra-memory-lab:v1:' + location.pathname.replace(/index\.html$/, '');
 let project, repositoryProject, repositoryFingerprint, draftBaseFingerprint, dirty = false, stale = false, saved = true;
 let taskSearch = '', suiteFilter = '', statusFilter = '', coverageFilter = '', resultTask = '', logOutcome = '', logMethod = '';
 let editingTrial = null, toastTimer, openTasks = new Set(), page = 'overview', activeTask = '';
-const names = { overview: '实验总览', tasks: '任务与进度', coverage: '能力覆盖', results: '实验结果', protocol: '评测协议', maintain: '维护与导出' };
+const names = { overview: '实验总览', method: 'FDS 方法对齐', tasks: '任务与进度', coverage: '能力覆盖', results: '实验结果', protocol: '评测协议', maintain: '维护与导出' };
 const fingerprint = value => {
   const text = JSON.stringify(value);
   let hash = 2166136261;
@@ -69,9 +69,9 @@ function sourceCards() {
 }
 
 function methods(cardsOnly = false) {
-  const mainMethods = project.methods.filter(m => ['direct', 'history', 'ours'].includes(m.id));
+  const mainMethods = project.methods.filter(m => ['direct', 'history', 'contract-off', 'ours'].includes(m.id));
   const cards = '<div class="method-grid">' + mainMethods.map(m => '<article class="method-card ' + (m.kind === 'ours' ? 'ours' : '') + '"><div class="method-label">' + (m.kind === 'ours' ? 'OUR SYSTEM' : 'BASELINE / ' + e(m.id.toUpperCase())) + '</div><h3>' + e(m.name) + '</h3><p>' + e(m.description) + '</p><small>' + e(m.control) + '</small></article>').join('') + '</div>';
-  return cards + (cardsOnly ? '' : '<div class="notice">主要比较：Ours vs Astra-History。Summary 与 Frozen 为补充基线 / 机制消融，方法与动作设置均需在测试前冻结。</div>');
+  return cards + (cardsOnly ? '' : '<div class="notice">主要比较：同版本 Task Harness F0 vs F1。Astra-Direct 为可选系统参考；Memory、Skill 与 RSI 的独立贡献需要另外的受控实验。</div>');
 }
 
 function renderOverview() {
@@ -80,13 +80,31 @@ function renderOverview() {
   const testTrials = project.trials.filter(t => t.phase === 'test' && t.outcome !== 'invalid');
   const ready = project.tasks.reduce((sum, t) => sum + t.preparation.filter(x => x.done).length, 0);
   const total = project.tasks.reduce((sum, t) => sum + t.preparation.length, 0);
-  return '<section class="hero"><div class="hero-copy"><div class="hero-meta"><span class="eyebrow">MEMORY IN MOTION</span><span class="chip orange">方案 v' + e(project.meta.version) + '</span></div><h1>让记忆，<br>成为<span>可验证的能力。</span></h1><p>在同一 Astra 与 Franka 控制接口下，检验记忆系统能否更可靠地保存历史、检索事件，并把新的观察转化为正确行动。</p><div class="hero-actions"><a class="button primary" href="#tasks">查看实验任务 <span aria-hidden="true">↗</span></a><a class="button secondary" href="#coverage">检查能力覆盖</a></div></div><div class="memory-visual" aria-label="记忆保存、历史检索和状态更新共同指导下一次行动"><div class="visual-top"><span>AN EPISODE OF MEMORY</span><span>OBSERVE → ACT</span></div><div class="memory-track"><div class="memory-node"><span aria-hidden="true">▧</span><strong>保存历史</strong><small>WRITE</small></div><span class="memory-arrow" aria-hidden="true">→</span><div class="memory-node"><span aria-hidden="true">⌕</span><strong>检索事件</strong><small>RETRIEVE</small></div><span class="memory-arrow" aria-hidden="true">→</span><div class="memory-node"><span aria-hidden="true">↻</span><strong>更新状态</strong><small>UPDATE</small></div></div><div class="visual-bottom"><span>PAST OBSERVATIONS</span><span>NEXT CORRECT ACTION ↗</span></div></div></section>' +
+  return '<section class="hero"><div class="hero-copy"><div class="hero-meta"><span class="eyebrow">EVIDENCE BEFORE ACTION</span><span class="chip orange">方案 v' + e(project.meta.version) + '</span></div><h1>让决策，<br>经得起<span>证据核对。</span></h1><p>基于 FDS 实际实现，在相同记忆与控制条件下，检验决策契约能否减少过早行动，并帮助系统发现和修正错误。</p><div class="hero-actions"><a class="button primary" href="#tasks">查看实验任务 <span aria-hidden="true">↗</span></a><a class="button secondary" href="#coverage">检查能力覆盖</a></div></div><div class="memory-visual" aria-label="记忆保存、历史检索和状态更新共同指导下一次行动"><div class="visual-top"><span>AN EPISODE OF MEMORY</span><span>OBSERVE → ACT</span></div><div class="memory-track"><div class="memory-node"><span aria-hidden="true">▧</span><strong>保存历史</strong><small>WRITE</small></div><span class="memory-arrow" aria-hidden="true">→</span><div class="memory-node"><span aria-hidden="true">⌕</span><strong>检查依据</strong><small>CHECK</small></div><span class="memory-arrow" aria-hidden="true">→</span><div class="memory-node"><span aria-hidden="true">↻</span><strong>依据反馈更新</strong><small>REVISE</small></div></div><div class="visual-bottom"><span>PAST OBSERVATIONS</span><span>NEXT CORRECT ACTION ↗</span></div></div></section>' +
     '<div class="stat-grid">' + stat('核心任务', core.length, core.length === project.tasks.length ? '本轮只做四类代表性机制' : '另含 ' + (project.tasks.length - core.length) + ' 项可选能力边界') + stat('基准对应', '16', '覆盖矩阵逐项说明缺口', '项') + stat('任务完成', completed, ready + ' / ' + total + ' 项准备工作完成', '/ ' + project.tasks.length) + stat('正式执行', testTrials.length || '—', testTrials.length ? '按逐回合真实记录统计' : '尚未录入实验结果', testTrials.length ? '回合' : '') + '</div>' +
-    '<div class="overview-columns"><section class="panel"><div class="panel-title"><h3>本轮四类实验</h3><a href="#tasks">全部任务 ↗</a></div>' + project.tasks.filter(t => t.priority === '核心').map(t => '<a class="compact-task" href="#tasks/' + e(t.id) + '"><span class="task-number">' + e(t.id) + '</span><div class="compact-task-copy"><h4>' + e(t.title) + '</h4><p>' + e(t.suite) + ' · ' + e(t.englishTitle) + '</p></div>' + status(t) + '<span class="compact-arrow" aria-hidden="true">↗</span></a>').join('') + '</section><section class="focus-panel"><span class="eyebrow">THE CENTRAL COMPARISON</span><h3>检验记忆与更新的额外收益</h3><p>把人工工作集中在示范录制、开局核对和停机复位。固定示范跨方法复用，机器人执行时无需人手同步移物。</p><div class="comparison-row"><strong>Astra-History</strong><span>→</span><strong>Astra + harness</strong></div><ul class="focus-list"><li><span>01</span>相同终态，不同历史：动作是否随历史改变？</li><li><span>02</span>旧关联失效：系统是否使用最新有效信息？</li><li><span>03</span>效果提升：需要多少额外时间与 token？</li></ul></section></div>' +
-    section('01', '三组主要对照', '同一模型、同一执行接口，明确历史与记忆的差异。') + methods(true) +
-    '<div class="notice"><strong>首轮规模：</strong>4 类 × 每类 10 个独立场景 × 3 方法 = 120 回合。两个条件各 5 个场景；T2–T4 共准备 30 段可复用示范。增加样本时扩到每类 20 个，而不增加任务类别。</div>' +
+    '<div class="overview-columns"><section class="panel"><div class="panel-title"><h3>本轮四类实验</h3><a href="#tasks">全部任务 ↗</a></div>' + project.tasks.filter(t => t.priority === '核心').map(t => '<a class="compact-task" href="#tasks/' + e(t.id) + '"><span class="task-number">' + e(t.id) + '</span><div class="compact-task-copy"><h4>' + e(t.title) + '</h4><p>' + e(t.suite) + ' · ' + e(t.englishTitle) + '</p></div>' + status(t) + '<span class="compact-arrow" aria-hidden="true">↗</span></a>').join('') + '</section><section class="focus-panel"><span class="eyebrow">THE CENTRAL COMPARISON</span><h3>固定记忆，检验 FDS 的额外收益</h3><p>把人工工作集中在示范录制、开局核对和停机复位。固定示范跨方法复用，机器人执行时无需人手同步移物。</p><div class="comparison-row"><strong>Task Harness · F0</strong><span>→</span><strong>+ FDS · F1</strong></div><ul class="focus-list"><li><span>01</span>准备行动前：依据是否足够支持当前选择？</li><li><span>02</span>失败或旧假设失效后：能否发现并修正？</li><li><span>03</span>效果提升：需要多少额外时间与 token？</li></ul></section></div>' +
+    section('01', '两组主对比，一组系统参考', '同一 FDS 提交，固定 memory、skills=[] 和无在线 RSI。') + methods(true) +
+    '<div class="notice"><strong>首轮规模：</strong>4 类 × 每类 10 个独立场景 × F0/F1 = 80 回合。可选 Astra-Direct 追加 40，总计 120。两个条件各 5 个场景；30 段示范跨方法复用，16 次独立 dev 执行另计。<a href="#method">查看实现依据与待接入项 ↗</a></div>' +
     section('02', '研究依据', '官方定义与本项目方案分开记录。') + sourceCards() +
     '<div class="notice">' + e(project.meta.notes) + ' 当前任务对应关系不表示已经完成真机验证。</div>';
+}
+
+
+function renderMethod() {
+  const a = project.methodAlignment;
+  if (!a) return intro('METHOD ALIGNMENT', '当前草稿尚未包含 FDS 对齐。', '先导出旧草稿保存记录，再恢复共享方案查看新的方法依据。');
+  const cards = rows => '<div class="protocol-grid">' + rows.map(x => '<article class="protocol-card"><span class="chip outline">' + e(x.status) + '</span><h3>' + e(x.title) + '</h3><p>' + e(x.body) + '</p>' + (x.source ? '<a class="task-link" href="' + e(safeUrl(x.source)) + '" target="_blank" rel="noopener noreferrer">固定提交中的实现 ↗</a>' : '') + '</article>').join('') + '</div>';
+  return intro('FDS × FRANKA', '从实际实现，定义要验证的贡献。', a.positioning) +
+    '<div class="method-provenance"><span class="chip green">已核对代码</span><span>FDS <code>' + e(a.commit.slice(0, 7)) + '</code> · ' + e(a.reviewedAt) + '</span><a href="' + e(safeUrl(a.repository)) + '" target="_blank" rel="noopener noreferrer">方法仓库（需访问权限） ↗</a></div>' +
+    '<div class="evidence-flow" aria-label="公开观察经过显式记忆、决策契约、真实行动和反馈更新形成闭环">' + ['公开观察', '显式记忆', '决策契约', '真实行动', '反馈与修正'].map((x, i) => '<div><small>0' + (i + 1) + '</small><strong>' + x + '</strong></div>').join('') + '</div>' +
+    '<div class="notice orange"><strong>当前证据边界：</strong>host 核验格式、引用和声明之间的关系；合法证据引用不保证语义正确，命令完成不保证任务成功。Franka 适配仍需接入，页面尚无真实结果。</div>' +
+    section('01', '代码已经做了什么', '区分仓库中的实现、论文假设与真机接入工作。') + cards(a.facts) +
+    section('02', '主对比只切换一个因素', '固定 Harness=1、Memory=1、Skill=0、测试期 RSI=0。') +
+    '<div class="protocol-grid">' + a.configs.map(c => '<article class="protocol-card"><h3>' + e(c.title) + '</h3><pre class="config-code"><code>' + e(c.code) + '</code></pre><p>' + e(c.body) + '</p></article>').join('') + '</div>' +
+    '<div class="maintenance-card method-controls"><h3>两组共同固定</h3>' + list(a.controls, true) + '</div>' +
+    section('03', '消融要有真实开关', '首轮硬件只做 F0/F1；其他机制优先在仿真或离线完成。') + cards(a.ablations) +
+    section('04', '正式真机实验前的接入项', '这些是待完成事项，不代表仓库已经支持 Franka 执行。') + cards(a.readiness) +
+    '<div class="notice">若论文主张仍以“记忆增强”为主，应另外证明 Memory 的贡献。仅 F0/F1 能隔离 FDS 效果，F1 与原始 Astra-Direct 的差异是系统整体效果。</div>';
 }
 
 function taskCard(t) {
@@ -130,7 +148,7 @@ function renderCoverage() {
     '<div class="table-panel"><table class="data-table"><thead><tr><th>SUITE</th><th>RoboMME-Plus 任务</th><th>真机任务</th><th>设计对应</th><th>已覆盖的设计与剩余缺口</th></tr></thead><tbody>' + rows.map(c => '<tr><td class="coverage-suite">' + e(c.suite) + '</td><td class="mono">' + e(c.benchmark) + '</td><td>' + (taskLinks(c.tasks) || '<span class="text-muted">—</span>') + '</td><td><span class="chip coverage-' + e(c.level) + '">' + e(COVERAGE[c.level]) + '</span></td><td class="coverage-note">' + e(c.note) + '</td></tr>').join('') + '</tbody></table></div>' +
     '<div class="notice orange">本轮有意收敛：实时按键、摆动周期、可见物体高亮 / repick、滚球与工具迁移、精密插入和动态绕障未列入正式真机实验。矩阵保留这些缺口，不为凑齐 16 项增加操作负担。</div>' +
     section('01', '如何使用这张矩阵', '先证明关键记忆机制能迁移到硬件，再据实际结果界定能力范围。') +
-    '<div class="protocol-grid"><article class="protocol-card"><div class="protocol-number">SIMULATION</div><h3>完整基准表现</h3><p>仿真若完成官方 16 项任务与 800 个固定测试回合，可用于支持整体基准结论。零样本与适配设置分别记录。</p></article><article class="protocol-card"><div class="protocol-number">REAL WORLD</div><h3>硬件上的机制证据</h3><p>真机重点评估历史保存、事件检索、连续更新和经验利用。只有离线观察回放的实验，应标注为离线诊断。</p></article></div>';
+    '<div class="protocol-grid"><article class="protocol-card"><div class="protocol-number">SIMULATION</div><h3>完整基准表现</h3><p>仿真若完成官方 16 项任务与 800 个固定测试回合，可用于支持整体基准结论。零样本与适配设置分别记录。</p></article><article class="protocol-card"><div class="protocol-number">REAL WORLD</div><h3>硬件上的机制证据</h3><p>真机评估计数、藏物更新、事件指代和顺序执行中的决策可靠性；经验仅限 episode 内。离线诊断不能当作真实执行收益。</p></article></div>';
 }
 
 function resultCell(trials, ours) {
@@ -148,7 +166,7 @@ function renderResults() {
   const valid = project.trials.filter(t => t.phase === 'test' && t.outcome !== 'invalid');
   const uniqueScenes = new Set(valid.map(t => JSON.stringify([t.taskId, t.conditionId, t.scenarioId])));
   const testedTasks = new Set(valid.map(t => t.taskId));
-  const methodIds = ['direct', 'history', 'ours', ...['summary', 'frozen'].filter(id => project.trials.some(t => t.methodId === id))];
+  const methodIds = project.methods.filter(m => ['baseline', 'ours'].includes(m.kind) || project.trials.some(t => t.methodId === m.id)).map(m => m.id);
   const displayMethods = methodIds.map(id => project.methods.find(m => m.id === id)).filter(Boolean);
   const logs = filteredLogs();
   const tasks = project.tasks.filter(t => !resultTask || t.id === resultTask);
@@ -160,7 +178,7 @@ function renderResults() {
     '<div class="stat-grid">' + stat('全部执行记录', project.trials.length, '包含开发、正式与无效回合') + stat('正式有效执行', valid.length, '成功 / 失败 / 人工干预') + stat('已记录场景', uniqueScenes.size, '按任务 × 条件 × 场景去重') + stat('已测试任务', testedTasks.size, '仅统计有效正式测试', '/ ' + project.tasks.length) + '</div>' +
     (project.trials.length ? '' : '<div class="empty-state"><div class="empty-mark" aria-hidden="true">↗</div><h3>第一份实验结果，从这里开始。</h3><p>目前只保存实验方案，没有预填成功率。记录一次真实执行后，结果表会自动按条件汇总。</p>' + button('record', '记录一次执行', 'primary') + '</div>') +
     section('01', '主结果表', '显示成功率、成功数 / 有效执行数；独立场景给出 95% Wilson 区间。', button('record', '+ 记录执行', 'primary')) +
-    '<div class="toolbar"><select id="result-task" aria-label="筛选结果任务">' + options([['', '全部任务'], ...project.tasks.map(t => [t.id, t.id + ' · ' + t.title])], resultTask) + '</select><span class="filter-summary">主要对照：Ours vs Astra-History</span></div>' +
+    '<div class="toolbar"><select id="result-task" aria-label="筛选结果任务">' + options([['', '全部任务'], ...project.tasks.map(t => [t.id, t.id + ' · ' + t.title])], resultTask) + '</select><span class="filter-summary">主要对照：同版本 F0 vs F1</span></div>' +
     '<div class="table-panel"><table class="data-table"><thead><tr><th>任务</th><th>测试条件</th>' + displayMethods.map(m => '<th>' + e(m.name) + '</th>').join('') + '</tr></thead><tbody>' + tableRows.join('') + '</tbody></table></div>' +
     '<div class="notice">表中区间以独立场景为前提。同一方法、任务与条件存在重复场景时，不展示逐执行 Wilson 区间；配对差异和重复场景的区间需另外按场景分析。零记录表示“待测”，不等于 0% 成功。</div>' +
     section('02', '逐回合记录', '下面的筛选仅影响记录列表和 CSV 导出，不改变上方 SR 的分母。', button('csv', '导出 CSV')) +
@@ -193,7 +211,7 @@ function renderMaintain() {
     '<div class="maintenance-grid"><section class="maintenance-card"><span class="eyebrow">LOCAL DRAFT → SHARED VERSION</span><h3 style="margin-top:10px">维护与发布</h3><p>编辑任务进度、复位备注和逐回合结果。导入文件整体替换本机草稿，不会直接修改 GitHub。</p><div class="maintenance-actions">' + button('export', '导出 project.json', 'primary') + button('import', '导入数据') + button('csv', '导出结果 CSV') + '</div><ol class="maintenance-steps"><li>编辑完成，点击<strong>导出 project.json</strong>。</li><li>替换 GitHub 的 <code>site/data/project.json</code> 并提交。</li><li>等待 Actions 验证和部署，再刷新共享版本。</li></ol>' +
     (repo ? '<a class="button small orange" style="margin-top:18px" href="' + e(repo + '/edit/main/site/data/project.json') + '" target="_blank" rel="noopener noreferrer">在 GitHub 编辑数据 ↗</a>' : '') +
     '<br><button class="danger-link" data-action="reset">恢复仓库版本，清除本机草稿</button></section>' +
-    '<section class="maintenance-card"><span class="eyebrow">SMALLER EXPERIMENT BUDGET</span><h3 style="margin-top:10px">先跑四类，样本按预算增加</h3><p>按每类总场景数估算，两个条件共享这些场景。不是每条件各做所填数量；同一场景在不同方法下独立复位执行。</p><div id="budget-display"></div><div class="budget-controls"><label>每类总场景 <input id="budget-n" type="number" min="2" max="1000" value="' + (project.planning?.scenesPerTask || 10) + '"></label><label>对照设置 <select id="budget-methods"><option value="all">三组：Direct / History / Ours</option><option value="primary">两组：History / Ours</option></select></label></div><div class="notice">' + coreCount + ' 类首轮建议每类 10 个场景；资源允许再补到 20 个。预实验、额外真机消融另计，不能保证小样本显著。</div></section></div>' +
+    '<section class="maintenance-card"><span class="eyebrow">SMALLER EXPERIMENT BUDGET</span><h3 style="margin-top:10px">先跑四类，样本按预算增加</h3><p>按每类总场景数估算，两个条件共享这些场景。不是每条件各做所填数量；同一场景在不同方法下独立复位执行。</p><div id="budget-display"></div><div class="budget-controls"><label>每类总场景 <input id="budget-n" type="number" min="2" max="1000" value="' + (project.planning?.scenesPerTask || 10) + '"></label><label>对照设置 <select id="budget-methods"><option value="primary">主对比：F0 / F1</option><option value="all">追加参考：F0 / F1 / Direct</option></select></label></div><div class="notice">' + coreCount + ' 类首轮建议每类 10 个场景；资源允许再补到 20 个。预实验、额外真机消融另计，不能保证小样本显著。</div></section></div>' +
     section('01', '项目设置', '保存到本机草稿，导出后进入版本管理。') +
     '<section class="maintenance-card"><div class="form-grid">' + [
       ['robot', '机器人与夹爪'], ['cameras', '相机设置'], ['modelVersion', '模型版本'], ['configurationRevision', '提示 / 配置版本'], ['repositoryUrl', 'GitHub 仓库地址'], ['version', '方案版本']
@@ -204,7 +222,8 @@ function renderMaintain() {
 function updateBudget() {
   if (!document.querySelector('#budget-display')) return;
   const n = Number(document.querySelector('#budget-n').value);
-  const selected = document.querySelector('#budget-methods').value === 'primary' ? ['history', 'ours'] : (project.planning?.methodIds || ['direct', 'history', 'ours']);
+  const primary = project.planning?.methodIds || ['history', 'ours'];
+  const selected = document.querySelector('#budget-methods').value === 'primary' ? primary : [...new Set([...primary, 'direct'])].filter(id => project.methods.some(m => m.id === id));
   const estimate = planWorkload(project, n, selected);
   if (!estimate) { document.querySelector('#budget-display').innerHTML = '<p class="notice">请输入至少 2 个独立场景。</p>'; return; }
   const split = estimate.allocations[0]?.conditions.map(c => c.scenes).join(' + ') || '';
@@ -221,13 +240,13 @@ function rememberOpen() {
 function render() {
   rememberOpen();
   const focusId = document.activeElement?.id;
-  const renderers = { overview: renderOverview, tasks: renderTasks, coverage: renderCoverage, results: renderResults, protocol: renderProtocol, maintain: renderMaintain };
+  const renderers = { overview: renderOverview, method: renderMethod, tasks: renderTasks, coverage: renderCoverage, results: renderResults, protocol: renderProtocol, maintain: renderMaintain };
   main.innerHTML = (stale ? '<div class="notice orange stale-banner"><strong>共享方案已更新为 v' + e(repositoryProject.meta.version) + '（' + repositoryProject.tasks.length + ' 类）。</strong>当前显示的是旧本机草稿，请先导出保留，再恢复共享版本。 ' + button('reset', '恢复共享方案') + '</div>' : '') + renderers[page]();
   if (page === 'tasks') refreshTasks();
   if (page === 'maintain') updateBudget();
   updateChrome();
   document.querySelector('#page-name').textContent = names[page];
-  document.title = names[page] + ' · Astra Memory Lab';
+  document.title = names[page] + ' · ' + project.meta.title;
   document.querySelectorAll('[data-route]').forEach(a => {
     const active = a.dataset.route === page;
     a.classList.toggle('active', active);
@@ -290,6 +309,11 @@ function showTrial(taskId = '', trial = null) {
     selectField('targetCorrect', '首次目标是否正确', [['', '未评分'], ['true', '正确'], ['false', '错误']], String(t.targetCorrect ?? '')) +
     selectField('orderCorrect', '操作顺序是否正确', [['', '未评分'], ['true', '正确'], ['false', '错误']], String(t.orderCorrect ?? '')) +
     selectField('staleMemoryUsed', '是否使用失效记忆', [['', '未评分'], ['true', '是'], ['false', '否']], String(t.staleMemoryUsed ?? '')) +
+    inputField('decisionRejections', '协议拒绝数（未统计留空）', t.decisionRejections, 'number', 'min="0" step="1"') +
+    inputField('decisionRecoveries', '恢复通过校验的序列数', t.decisionRecoveries, 'number', 'min="0" step="1"') +
+    selectField('semanticFailureObserved', '是否发生可观察物理 / 语义失败', [['', '未标注'], ['true', '是'], ['false', '否']], String(t.semanticFailureObserved ?? '')) +
+    selectField('prematureAction', '依据不足是否仍采取依赖动作', [['', '未标注'], ['true', '是'], ['false', '否']], String(t.prematureAction ?? '')) +
+    '<p class="field-note span-two">协议恢复只表示重新通过校验；真实失败后的恢复结合最终结果单独分析。F0 没有 FDS 契约，契约专属指标为 N/A。</p>' +
     inputField('modelVersion', '模型版本', t.modelVersion || project.meta.modelVersion) +
     inputField('configRevision', '提示 / 配置版本', t.configRevision || project.meta.configurationRevision) +
     '<label class="field span-two"><span>失败标签（以中文或英文逗号分隔）</span><input name="failureTags" value="' + e((t.failureTags || []).join('，')) + '" placeholder="例如：使用旧位置，抓取失败" maxlength="2000"></label>' +
@@ -310,6 +334,8 @@ document.querySelector('#trial-form').addEventListener('submit', event => {
     scenarioId: text('scenarioId'), repeatIndex: num('repeatIndex'), phase: text('phase'), outcome: text('outcome'),
     demoId: text('demoId'), resetVerified: bool('resetVerified'), setupSec: num('setupSec'), resetSec: num('resetSec'),
     durationSec: num('durationSec'), inferenceSec: num('inferenceSec'), motionSec: num('motionSec'), tokens: num('tokens'),
+    decisionRejections: num('decisionRejections'), decisionRecoveries: num('decisionRecoveries'),
+    semanticFailureObserved: bool('semanticFailureObserved'), prematureAction: bool('prematureAction'),
     targetCorrect: bool('targetCorrect'), orderCorrect: bool('orderCorrect'), staleMemoryUsed: bool('staleMemoryUsed'),
     failureTags: text('failureTags').split(/[,，]/).map(s => s.trim()).filter(Boolean),
     notes: text('notes'), videoUrl: text('videoUrl'), modelVersion: text('modelVersion'), configRevision: text('configRevision'),

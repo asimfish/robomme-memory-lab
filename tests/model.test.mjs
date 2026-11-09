@@ -98,16 +98,39 @@ test('all benchmark mapping references and phase/status enums remain valid on im
 });
 
 test('the workload counts scenes per task rather than multiplying them by condition count', () => {
-  const s = planWorkload(source, 10, ['direct', 'history', 'ours']);
+  const s = planWorkload(source, 10, ['direct', 'contract-off', 'ours']);
   const core = source.tasks.filter(t => t.priority === '核心');
   assert.equal(s.episodes, core.length * 10 * 3);
   assert.equal(s.independentScenes, core.length * 10);
   for (const task of s.allocations) assert.equal(task.conditions.reduce((sum, c) => sum + c.scenes, 0), 10);
   assert.equal(s.demoClips, core.filter(t => t.operations?.requiresDemo).length * 10);
-  assert.equal(planWorkload(source, 10, ['history', 'ours']).episodes, core.length * 10 * 2);
+  assert.equal(planWorkload(source, 10, ['contract-off', 'ours']).episodes, core.length * 10 * 2);
   assert.equal(planWorkload(source, 20).episodes, core.length * 20 * source.planning.methodIds.length);
   assert.equal(planWorkload(source, 0), null);
   assert.equal(planWorkload(source, 10, ['ours', 'ours']), null);
+});
+
+test('protocol correction is recorded separately from physical failure and cannot exceed rejections', () => {
+  const p = fresh();
+  p.trials = [record('correction', { decisionRejections: 2, decisionRecoveries: 1, semanticFailureObserved: false, prematureAction: null })];
+  assert.doesNotThrow(() => validateProject(p));
+  p.trials[0].decisionRecoveries = 3;
+  assert.throws(() => validateProject(p), /恢复序列/);
+  p.trials[0].decisionRecoveries = null;
+  p.trials[0].semanticFailureObserved = 'false';
+  assert.throws(() => validateProject(p), /semanticFailureObserved/);
+  delete p.trials[0].semanticFailureObserved;
+  assert.doesNotThrow(() => validateProject(p));
+  assert.ok(toCsv(p.trials).includes('"decisionRejections","decisionRecoveries","semanticFailureObserved","prematureAction"'));
+});
+
+test('legacy drafts remain importable while method source URLs are validated', () => {
+  const p = fresh();
+  delete p.methodAlignment;
+  assert.doesNotThrow(() => validateProject(p));
+  const q = fresh();
+  q.methodAlignment.facts[0].source = 'javascript:alert(1)';
+  assert.throws(() => validateProject(q), /实现依据/);
 });
 
 test('operator metadata accepts missing measurements and validates recorded preparation times', () => {

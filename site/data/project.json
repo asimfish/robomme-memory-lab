@@ -1,53 +1,39 @@
 {
   "schemaVersion": 1,
   "meta": {
-    "title": "Astra Memory Lab",
-    "subtitle": "四类真机实验 · 可复现的人工操作",
-    "version": "0.2.0",
-    "updatedAt": "2026-11-08",
+    "title": "FDS × Franka Lab",
+    "subtitle": "四类记忆任务 · 决策证据与纠错",
+    "version": "0.3.0",
+    "updatedAt": "2026-11-09",
     "repositoryUrl": "https://github.com/asimfish/robomme-memory-lab",
-    "phase": "四类方案细化",
+    "phase": "FDS 对齐稿 · 待实机接入",
     "robot": "Franka（型号与夹爪待填写）",
     "cameras": "固定外部视角 + 腕部视角（按实机确认）",
-    "modelVersion": "待填写",
-    "configurationRevision": "待冻结",
-    "notes": "首轮只安排四类实验。人工工作集中于示范录制、开局布置与停机复位，机器人执行期间不要求人工移物；全部参数待预实验冻结。"
+    "modelVersion": "gpt-6-astra · medium（锁定实际服务版本）",
+    "configurationRevision": "FDS 13a36d2；Franka adapter 与正式预算待冻结",
+    "notes": "基于 FDS 固定提交核对：主实验固定 harness、memory、skills=[] 与无在线 RSI，仅切换 contract off/full。四类共 80 次主对比，可追加 40 次 Astra-Direct 系统参考；尚无真实执行结果。"
   },
   "methods": [
     {
-      "id": "direct",
-      "name": "Astra-Direct",
+      "id": "contract-off",
+      "name": "Task Harness · F0",
       "kind": "baseline",
-      "description": "短期交互观察，不保留跨调用对话；预录示范作为固定任务输入可在每次动作调用重放。",
-      "control": "统一的绝对末端位姿与夹爪动作接口。"
-    },
-    {
-      "id": "history",
-      "name": "Astra-History",
-      "kind": "baseline",
-      "description": "相同固定示范，加完整文字、图像与动作反馈历史，作为主要强基线。",
-      "control": "执行长度、控制器、反馈与 Ours 保持一致。"
+      "description": "同一 FDS Task Harness，关闭决策契约；保留对象 / 事件 / 经验记忆、关键帧、观察回看、工具、运动反馈与有预算的决策纠正。",
+      "control": "enabled=false；contract_mode=off。主因果对照，不称为原始 Astra-Direct。"
     },
     {
       "id": "ours",
-      "name": "Astra + harness",
+      "name": "Task Harness + FDS · F1",
       "kind": "ours",
-      "description": "相同原始任务输入与候选观察，使用记忆保存、检索和更新机制。",
-      "control": "共享相机、标定、动作接口和预算上限。"
+      "description": "同一版本打开 full：结构化决策契约、证据引用和前置条件校验，以及执行后 verdict 的下一轮反馈。",
+      "control": "enabled=true；contract_mode=full。memory / skills / controller / budgets 与 F0 相同。"
     },
     {
-      "id": "summary",
-      "name": "Astra-Summary",
+      "id": "direct",
+      "name": "Astra-Direct · 系统参考",
       "kind": "optional",
-      "description": "固定预算的滚动文字摘要，可选补充基线。",
-      "control": "所有摘要与额外模型开销计入总成本。"
-    },
-    {
-      "id": "frozen",
-      "name": "Ours-Frozen",
-      "kind": "ablation",
-      "description": "T2 的可选离线诊断：初始记忆后冻结写入；不计入四类首轮真机预算。",
-      "control": "只用于 T2 的可选离线更新诊断；若做额外真机执行，单独计入预算。"
+      "description": "保留你们原始 Astra 直接控制实现，用于报告完整系统收益。需锁定原始代码与输入策略，并接入相同 Franka 控制层。",
+      "control": "可选追加 40 次。与 F1 的差异含 harness 和 memory，不能单独归因于 FDS；不是把 F0 的 keyframe 数设为 0。"
     }
   ],
   "tasks": [
@@ -59,8 +45,8 @@
       "priority": "核心",
       "status": "planned",
       "owner": "",
-      "notes": "",
-      "purpose": "在每次取放后恢复近似相同画面，检验完成次数的记忆与更新；不靠人手增减物体制造干扰。",
+      "notes": "FDS 对齐稿。主对比为同版本 F0/F1；正式硬件参数与判据尚待 dev 冻结。",
+      "purpose": "检验系统是否根据实际抓起、离桌、放回、释放证据更新事件计数；重点区分“发出了成功命令”和“完成了一次物理循环”。",
       "prompt": "Pick up the red block and return it to the same pad exactly six times. Then move the empty gripper to the marked finish zone.",
       "props": [
         "1 个规则积木",
@@ -68,9 +54,9 @@
         "固定外部相机与现有腕部视角"
       ],
       "steps": [
-        "人工按场景卡摆好积木，机器人回 home。",
-        "Franka 反复夹起同一积木并放回同一垫内。",
-        "完成指定次数后，空夹爪移到停止区结束；根据实际成功循环评分。"
+        "人工按卡片摆同一积木，核对相机和停止区，确认机器人停稳后退出。",
+        "机器人自主执行 3 或 6 次取放；允许观察和自主重试，按真实成功循环计数。",
+        "空夹爪进入停止区结束。工作人员随后依据视频数循环，不在执行中报数或纠正。"
       ],
       "conditions": [
         {
@@ -89,9 +75,10 @@
         "空抓、未离桌或未释放不计成功循环；机器人仍可自主重试。"
       ],
       "metrics": [
-        "完整回合 SR",
-        "累计循环误差",
-        "提前停止 / 多做次数"
+        "完整 SR 与最终循环数误差",
+        "空抓 / 未释放被记为成功的比例（有对应事件才计分母）",
+        "第一个错误计数与提前终止 / 额外循环发生时刻",
+        "出现可观察失败后的最终自主成功数 / 出现该失败的回合数"
       ],
       "failures": [
         "计数错误",
@@ -105,15 +92,21 @@
         "BinFill"
       ],
       "designNotes": [
-        "一次 episode 内不要求人工取走、补入或扶正物体。",
-        "每次释放后的桌面状态近似相同，使完成次数依赖交互历史。",
-        "定位垫允许的摆放偏差与实际循环判据在预实验后冻结。"
+        "F0 与 F1 都保留 events；差别是 F1 需把候选行动绑定假设、证据和可反驳结果。",
+        "计划动作、TCP 抬升、夹爪闭合、JSON 校验恢复均不自动算一次取放成功。",
+        "不故意制造危险抓取、不增加现场人工干预；自然失败很少时，恢复率写 N/A 或小分母，不宣称已验证恢复优势。",
+        "在每次物理动作后按共同采样规则提供可观察反馈；不得由评分器逐步提供正确计数。"
       ],
       "targetPerCondition": 5,
       "preparation": [
         {
           "id": "hardware",
           "label": "道具、定位板与标定就绪",
+          "done": false
+        },
+        {
+          "id": "adapter",
+          "label": "统一 Franka adapter 与 F0/F1 输入公平性预检通过",
           "done": false
         },
         {
@@ -165,8 +158,8 @@
       "priority": "核心",
       "status": "planned",
       "owner": "",
-      "notes": "",
-      "purpose": "用同一套带底小盒同时检验隐藏关联、手动重排后的追踪，以及新位置替换旧位置。",
+      "notes": "FDS 对齐稿。主对比为同版本 F0/F1；正式硬件参数与判据尚待 dev 冻结。",
+      "purpose": "检验模型能否把早期“目标在 A 盒”的假设随可见转移改为“目标在 B 盒”，并在首次揭盖前依据最新有效历史选择。",
       "prompt": "Watch the demonstration, then lift the lid of the box that currently contains the green block.",
       "props": [
         "4 个相同带底小盒及可夹取盒盖",
@@ -175,7 +168,7 @@
       ],
       "steps": [
         "人手录制目标藏入盒中、盒体重排、拿出目标并转移或放回的示范。",
-        "同一视频在三个方法间复用；执行前人工匹配视频终态。",
+        "F0/F1 共用同一原始示范，按共同规则抽帧与回看；人工将实物精确复位到录像终态。",
         "Franka 首次选择一个盒子并揭盖；首次选错即失败。"
       ],
       "conditions": [
@@ -195,9 +188,10 @@
         "不能打开错误盒后再搜索；状态变化必须在示范中清楚可见。"
       ],
       "metrics": [
-        "完整回合 SR",
-        "首次盒体选择正确率",
-        "转移条件旧记忆错误率"
+        "首次揭盖正确率与自主 SR",
+        "转移条件下仍选择旧目标盒的比例",
+        "关键转移证据的实际送达、回看和保留情况",
+        "首次错误揭盖 / 缺少证据仍行动的时刻（离线标注）"
       ],
       "failures": [
         "初始关联错误",
@@ -216,14 +210,22 @@
         "原独立记忆更新实验并入本类，不新增第五类任务。",
         "首轮每场景只查询一个目标，4 盒、重排次数和时长固定；具体节奏经预实验冻结。",
         "初始揭示可清楚可见，首轮不额外叠加多视角遮挡。",
-        "Frozen 可在相同历史上作离线诊断，不默认增加整套真机回合。",
-        "正式录制前确认机器人能独立揭盖、底盒不会被一并带起；该机械调试属于独立预实验。"
+        "正式录制前确认机器人能独立揭盖、底盒不会被一并带起；该机械调试属于独立预实验。",
+        "“引用合法”不代表“理解正确”：独立标注旧假设是否真正更新，不能只统计 host 的 provenance 拒绝。",
+        "转移与未转移条件使用相似动作节奏、交换次数和时长，最终目标槽位均衡；不给模型最终隐藏内容图。",
+        "首次错误揭盖为该任务终止错误；此任务主要测避免早期错误，不以揭错后逐盒搜索声称恢复。",
+        "转移前、转移中与重新盖上后的证据应在统一初始采样中可辨，或能通过共同 initial window 回看；若两组都无可访问信息，这张卡片不构成有效记忆实验。"
       ],
       "targetPerCondition": 5,
       "preparation": [
         {
           "id": "hardware",
           "label": "道具、定位板与标定就绪",
+          "done": false
+        },
+        {
+          "id": "adapter",
+          "label": "统一 Franka adapter 与 F0/F1 输入公平性预检通过",
           "done": false
         },
         {
@@ -265,71 +267,83 @@
           "移动带底盒体，避免倒扣杯移动时积木留在原地。",
           "操作时不要用手持续遮住关键身份运动；录完检查轨迹是否能从允许观察辨认。",
           "若用盒底编号复位，该编号只供工作人员核对，不能在模型画面中露出。",
-          "这是视频条件下的真实硬件执行，不代表机器人在实时移物中同步操作。"
+          "这是视频条件下的真实硬件执行，不代表机器人在实时移物中同步操作。",
+          "隐藏物核对在每种方法开始前完成并登记；不要仅在两组结束后才检查内部真值。",
+          "使用同一盒体、盖与可见标记规则；隐藏 ID 仅供场务辨认。方块必须随带底盒一起移动，不能假设倒扣杯会带着方块滑动。"
         ],
         "requiresDemo": true
       }
     },
     {
       "id": "T3",
-      "title": "事件与顺序指代",
-      "englishTitle": "Recall an event or an ordinal",
+      "title": "事件边界与历史指代",
+      "englishTitle": "Ground an event before referring to it",
       "suite": "历史指代",
       "priority": "核心",
       "status": "planned",
       "owner": "",
-      "notes": "",
-      "purpose": "使用固定托盘和预录手动放置，检验特定历史事件的检索；无需在执行中交换托盘。",
-      "prompt": "Place the red block on the tray where it was first placed after the event card was flipped.",
+      "notes": "FDS 对齐稿。主对比为同版本 F0/F1；正式硬件参数与判据尚待 dev 冻结。",
+      "purpose": "检验系统是否先识别真正的放下并释放事件，再理解“翻牌后第一次放置”；防止把经过或触碰目标当作已完成事件。",
+      "prompt": "Watch the demonstration. Place the red block in the tray where it was first placed and released after the event card was flipped. Passing over or touching a tray without release does not count.",
       "props": [
         "4 个固定托盘",
         "1 个红色积木",
         "双面事件牌与中性待放区"
       ],
       "steps": [
-        "人手录制 4–6 次托盘放置，中间翻转事件牌，最后把积木放回中性待放区。",
-        "执行前核对托盘与积木终态，向各方法提供同一场景视频与指令。",
-        "Franka 抓取积木并放到对应历史事件的托盘。"
+        "A 按卡片录制固定托盘上的放置序列、一次事件牌翻面和干扰动作；B 录像。",
+        "每个关键事件前后停留，确保可见手已松开、积木由托盘支撑；录像最后把积木移到统一中性待抓区。",
+        "F0/F1 看同一示范；机器人从中性区抓取积木并放入所指历史托盘，执行期间场务不再移动道具。"
       ],
       "conditions": [
         {
-          "id": "event",
-          "label": "事件指代",
-          "change": "选择事件牌翻面后第一次放置对应的托盘。"
+          "id": "clear-events",
+          "label": "清晰完成事件",
+          "change": "4 个固定托盘；翻牌后展示一次完整放置 / 释放，保持 2 秒，再展示后续事件。"
         },
         {
-          "id": "ordinal",
-          "label": "顺序指代",
-          "change": "选择第 k 次放置对应的托盘，序列与动作难度保持一致。"
+          "id": "ambiguous-events",
+          "label": "经过 / 接触干扰",
+          "change": "指令与托盘不变；翻牌后先经过或触碰一个干扰托盘且不松手，再在另一托盘真正放下并释放。控制总时长与真实放置数量接近。"
         }
       ],
       "success": [
-        "首次完成放置的托盘应为正确历史目标；接近错误托盘但未放置时可自主改正。"
+        "第一次完整放置 / 释放位于翻牌后首次真实放置的托盘。",
+        "干扰托盘上方经过可自行纠正；在错误托盘完成释放为终止错误。"
       ],
       "metrics": [
-        "完整回合 SR",
-        "历史目标托盘选择正确率"
+        "正确历史目标选择率与完整 SR",
+        "把经过 / 接触当完成事件的错误率",
+        "模型实际可见证据是否包括事件前后帧",
+        "在错误释放前主动回看并更正选择的次数（探索性过程指标）"
       ],
       "failures": [
-        "事件边界错误",
-        "顺序错误",
-        "混淆历史托盘",
-        "抓取或放置失败"
+        "事件顺序错误",
+        "经过当放置",
+        "接触当释放",
+        "忽略事件牌",
+        "错误托盘释放",
+        "抓取失败"
       ],
       "benchmark": [
-        "VideoPlaceButton",
-        "VideoPlaceOrder"
+        "VideoPlaceButton"
       ],
       "designNotes": [
-        "顺序指令示例：Place the red block on the tray where it was placed for the third time in the demonstration.",
-        "使用事件牌是对按钮事件的实机简化，论文中明确说明。",
-        "首轮固定托盘；不加入托盘交换、第二个积木或新物体泛化。"
+        "同一句指令用于两个条件，主要改变事件判别难度，不同时增加托盘移动与物体数量。",
+        "关键帧需要能区分 hand-held / released；两组同样可访问，不用答案驱动的人工选帧帮 F1。",
+        "正式真机主要对应 VideoPlaceButton 的事件指代；第 k 次放置可用同批视频做离线问答，不把离线结果计为额外真机覆盖。",
+        "第一个完成的错误释放为主要终止错误；还未释放时的自主回看或修正不是人工干预。"
       ],
       "targetPerCondition": 5,
       "preparation": [
         {
           "id": "hardware",
           "label": "道具、定位板与标定就绪",
+          "done": false
+        },
+        {
+          "id": "adapter",
+          "label": "统一 Franka adapter 与 F0/F1 输入公平性预检通过",
           "done": false
         },
         {
@@ -356,10 +370,9 @@
       "operations": {
         "mode": "预录人手演示；托盘固定，无需动态交换",
         "humanBefore": [
-          "在定位板上固定 4 个托盘，设置中性待放区和可翻面的事件牌。",
-          "人手把红色积木依次放入不同托盘，中间将事件牌从深色面翻到亮色面；最后把积木放回待放区并退出。",
-          "为每个独立场景录制一段不同序列；预先指定事件问题或顺序问题，保证答案在托盘间平衡。",
-          "执行前只需把积木放回待放区，核对托盘位置和事件牌终态，并播放该场景固定视频。"
+          "固定 4 个托盘、翻面牌与中性待抓区，按场景 ID 摆放。",
+          "A 按冻结脚本录制示范；干扰动作不松手，真正完成事件松手后停留 2 秒，避免手遮挡积木。",
+          "演示结束把积木移到中性区，保留托盘固定布局与事件牌终态；B 核对原视频和实物终态。"
         ],
         "duringExecution": "工作人员无需移动托盘、按按钮或给口头提示；Franka 根据历史选择托盘并放置积木。",
         "reset": [
@@ -367,9 +380,9 @@
           "托盘按定位标记核对即可，下一方法重用同一视频。"
         ],
         "consistency": [
-          "事件牌替代需要接线的按钮；事件由可见翻面定义，不依赖声音或人工口述。",
-          "保持最后积木位置与托盘布局一致，避免从最终画面直接猜出历史答案。",
-          "事件与顺序条件分别使用不同独立场景，不把同一视频的多个问题当独立样本。"
+          "托盘固定，不引入物体重排；同一视频跨方法复用，两个条件目标位置均衡。",
+          "只把完整释放计为演示中的放置事件；靠近、接触和经过不计。",
+          "原始视频、抽帧 ID、实际送达帧和可回看窗口分别记录，确保能定位漏看与误理解。"
         ],
         "requiresDemo": true
       }
@@ -382,8 +395,8 @@
       "priority": "核心",
       "status": "planned",
       "owner": "",
-      "notes": "",
-      "purpose": "用可重复的点阵板和一次固定的指示棒，检验示范顺序保存与复现。",
+      "notes": "FDS 对齐稿。主对比为同版本 F0/F1；正式硬件参数与判据尚待 dev 冻结。",
+      "purpose": "检验示范节点顺序、已经完成的执行进度与真实棒尖位置是否一致；比较“TCP 到达”与“工具端完成节点”的证据。",
       "prompt": "Watch the demonstration, then reproduce the same sequence of points on the fixed board, starting from the home position.",
       "props": [
         "固定 3×3 点阵板",
@@ -411,9 +424,10 @@
         "访问顺序正确，无漏点或额外节点，所有访问落在冻结阈值内。"
       ],
       "metrics": [
-        "完整回合 SR",
-        "节点顺序正确率",
-        "节点位置误差"
+        "完整节点序列 SR 与归一化编辑距离",
+        "首次漏节点 / 多节点 / 顺序错误",
+        "TCP 已到达但棒尖未满足节点判据时是否过早推进",
+        "节点执行中自然偏差后的自主修正与额外调用"
       ],
       "failures": [
         "顺序遗忘",
@@ -427,13 +441,21 @@
       "designNotes": [
         "T4 集中执行，指示棒每组装夹一次，不每回合换工具。",
         "固定网格优先隔离记忆；布局迁移、绕障与精密接触不纳入首轮。",
-        "示范不留痕，最终画面不暴露完整轨迹。"
+        "示范不留痕，最终画面不暴露完整轨迹。",
+        "两组使用相同且正确的工具偏移与标定；不通过给某组错误标定制造优势。",
+        "独立评分使用棒尖真实轨迹 / 视频，而不是只依赖 model 自报或 move_ee 收据；轨迹投影需先校准。",
+        "节点进入、离开和再进入规则、容差与高度阈值在 dev 冻结；接近但未满足节点标准时可自主调整，错误节点正式触发则按冻结规则处理。"
       ],
       "targetPerCondition": 5,
       "preparation": [
         {
           "id": "hardware",
           "label": "道具、定位板与标定就绪",
+          "done": false
+        },
+        {
+          "id": "adapter",
+          "label": "统一 Franka adapter 与 F0/F1 输入公平性预检通过",
           "done": false
         },
         {
@@ -570,16 +592,14 @@
         "T3"
       ],
       "level": "partial",
-      "note": "翻面事件牌代替按钮，托盘固定；不测运动托盘身份更新。"
+      "note": "翻牌事件后的首次真实放置指代，含经过 / 接触干扰；固定托盘，不测托盘运动或真实按钮反馈。"
     },
     {
       "suite": "Reference",
       "benchmark": "VideoPlaceOrder",
-      "tasks": [
-        "T3"
-      ],
-      "level": "partial",
-      "note": "第 k 次放置检索；不加入托盘交换与双物体交错历史。"
+      "tasks": [],
+      "level": "gap",
+      "note": "本轮 T3 正式真机固定为事件参照；第 k 次问答可复用视频做离线诊断，不能计入真机 SR 或覆盖。"
     },
     {
       "suite": "Imitation",
@@ -602,7 +622,7 @@
         "T4"
       ],
       "level": "partial",
-      "note": "固定网格上的顺序复现；不做网格变换或工具几何迁移。"
+      "note": "固定网格顺序与真实棒尖进度核对；不含布局变换、工具更换或动态障碍。"
     },
     {
       "suite": "Imitation",
@@ -614,61 +634,108 @@
   ],
   "protocol": [
     {
-      "title": "固定输入与示范可访问性",
-      "body": "所有方法获得相同示范与当前观察。Direct 不保留交互对话，但预录示范可作为固定任务输入重放；不要只因短期窗口丢失唯一示范而制造基线劣势。明确记录这些相对 Astranomy 的适配。"
+      "title": "主因果对照",
+      "body": "同一 FDS commit、同一真机 adapter、同一 memory、skills=[]、无测试期 RSI。仅改 fds.enabled 与 contract_mode。Astra-Direct 是可选系统参考；F1–Direct 不能等同于 FDS 的独立贡献。"
     },
     {
-      "title": "共享控制与终止",
-      "body": "统一相机、采样、几何、动作执行长度、反馈和预算。T1 用标记停止区结束，不需要电子按钮；评分计数不得逐步作为执行提示。"
+      "title": "观察窗口与演示证据",
+      "body": "T2–T4 原始示范作为 episode cue。按相同采样规则送达初始帧，首次环境动作前可主动回看；环境批次执行后旧窗口过期，只有已保留关键帧可继续访问。不要把可回看 ID 列表误当已看到图像。"
     },
     {
-      "title": "人工任务事件与救援分开",
-      "body": "固定预录的人手操作是任务输入，开局摆放和停机复位是准备工作。机器人执行中的额外提示、代抓或扶正为人工干预，不能算自主成功。"
+      "title": "等资源机会，不强求轨迹相同",
+      "body": "同一场景、初始状态、示范、相机与预算上限；自主动作或回看选择不同后，图像与 token 消耗可以不同，属于处理效果。F0 的一般执行指导和纠正机制保持完整。"
     },
     {
-      "title": "示范终态匹配",
-      "body": "T2 每次核对隐藏物、盒体位置与方向；T3 核对积木待放区、托盘与事件牌；T4 核对网格定位与棒尖偏移。机器人运行后发现复位不匹配，保留记录并按预注册规则处理。"
+      "title": "控制、反馈与评分隔离",
+      "body": "两组共用真实控制器、位姿 / 夹爪单位、限位、采样和公开错误反馈。TCP 跟踪不代表抓取或放置成功；真值计数、盒内位置、目标槽位、评分答案与人工标注不送给 planner。"
     },
     {
-      "title": "配对场景与统计单位",
-      "body": "首轮每类 10 个独立场景，两个条件各 5 个；每个场景跑三种方法，共 120 回合。相同视频跨方法是配对关系，不增加独立场景数。先报告各条件计数和区间，不保证小样本显著。"
+      "title": "配对预算",
+      "body": "4 类，每类 10 个独立场景，两个条件各 5 个；F0/F1 每场景各跑一次，共 80 回合。可选原始 Direct 追加 40。场景重试不增加独立样本数；扩样以每类 20 场景为下一档。"
     },
     {
-      "title": "开发冻结与记忆隔离",
-      "body": "独立预实验后冻结提示、示范、复位规则、循环 / 节点阈值与预算。每个 episode 清空任务记忆，评分答案与复位照片只供工作人员使用。"
+      "title": "开发与测试隔离",
+      "body": "每类 2 张独立 dev 卡 × 两方法，共 16 次开发执行，预算另计。校准后冻结正式配置、脚本、评分阈值与 40 张测试卡。测试中不得根据失败继续改 harness、skills 或关键帧抽取算法。"
     },
     {
-      "title": "能力范围",
-      "body": "本轮真机覆盖计数、藏物更新、历史指代和程序顺序四类代表性机制。预录动态示范并不代表真实时间中的动态闭环操作；实时按键、滚球、精密插入与复杂工具迁移留给仿真或后续研究。"
+      "title": "两类恢复分别统计",
+      "body": "协议恢复：非法响应后重新通过校验；物理 / 语义恢复：有可观察失败后最终自主完成任务。两个分母分开，前者不能替代后者。没有自然失败的任务，语义恢复率为 N/A；错误揭盖 / 错误释放等终止错误不允许事后搜索洗掉失败。"
+    },
+    {
+      "title": "人工事件与辅助干预",
+      "body": "任务示范、开局摆放和停机复位均为准备。所有任务正式执行期不安排人工移物；工作人员代抓、扶正、提供目标或计数提示属于干预，不算自主成功。"
+    },
+    {
+      "title": "顺序、复位与无效回合",
+      "body": "同场景两组相邻执行，按预先随机并平衡的顺序；每组开始前核对隐藏内容与终态，记录参考照片和示范哈希。复位错误、采集故障与服务故障按冻结规则保留原因；不能因策略失败或协议纠正耗尽而删除回合。"
+    },
+    {
+      "title": "盲标行为与契约诊断",
+      "body": "先由不知道方法标签的评分员只看视频、动作与任务判据，标首次错误、可观察失败及最终结果；再结合 F1 契约检查证据支持、过早承诺和反证条件。F0 没有契约，相关字段记 N/A，不能记成 0。"
+    },
+    {
+      "title": "统计与结论边界",
+      "body": "报每条件 x/n 与任务宏平均；以同场景 F1–F0 为主效应，按任务分层、场景配对 bootstrap 区间，或精确配对检验。每格 5 个场景只够探索，先看区间和失败分布，不保证显著；重复场景按场景聚类。"
+    },
+    {
+      "title": "覆盖与离线诊断",
+      "body": "四类真机支持记忆依赖任务中的决策可靠性迁移，不覆盖全部 RoboMME-Plus，也不证明自动视觉证伪。离线合同预检、同视频记忆问答、后续 Memory 2×2 与 RSI 结果分表报告，不与 80 次硬件 SR 混合。"
     }
   ],
   "metrics": [
     {
-      "name": "任务成功率 SR",
-      "definition": "完整满足任务要求的自主成功回合数 / 有效正式测试执行数。"
+      "name": "自主任务 SR / 配对增益",
+      "definition": "按真实物理判据统计 success / 有效正式回合；核心效应为同场景 F1−F0。报告任务宏平均、x/n 和区间。"
     },
     {
-      "name": "首次目标与顺序",
-      "definition": "从记录中的可评分字段统计目标选择与操作顺序正确率。"
+      "name": "首次终止错误",
+      "definition": "分别定义：T1 多做成功循环或提前结束；T2 首次错误揭盖；T3 首次错误完整释放；T4 首个违反冻结节点序列规则的事件。记录是否发生和时刻，不把所有近失误都称为不可逆。"
     },
     {
-      "name": "旧记忆错误",
-      "definition": "状态改变后仍按旧记录行动；T2 的转移与未转移条件分别报告。"
+      "name": "依据不足仍采取动作",
+      "definition": "两方法共同的行为指标：依据公开观察仍缺少必要确认时已执行相应依赖动作。按预注册标注标准评判，不能用 F1 的字段名代替 F0 的评分。"
     },
     {
-      "name": "时间与开销",
-      "definition": "总时长、推理等待和运动时长分别记录；所有尝试的 token 与记忆维护成本均保留。"
+      "name": "F1 语义误承诺",
+      "definition": "独立标注发现 claim 不被已提供证据支持的 committed 决策 / 可评分 committed 决策；与 host 拒绝的结构违规分开。F0 无契约，为 N/A。"
     },
     {
-      "name": "配对差异",
-      "definition": "主要比较 Ours 与 Astra-History。在相同场景条件下分析差异；重复场景需按场景聚类处理。"
+      "name": "真实失败后的最终恢复",
+      "definition": "出现可观察物理 / 语义失败后仍最终自主成功的回合数 / 出现该类失败的有效回合数。按失败类型和任务报分母；无失败则 N/A。这是条件性描述，不能忽略两方法产生的失败机会不同。"
     },
     {
-      "name": "人工准备与复位",
-      "definition": "单独记录开局布置与回合后复位耗时、示范 ID、复位是否核对；不与推理和机器人执行时间混在一起。"
+      "name": "协议拒绝与纠正",
+      "definition": "分别累计 decision_rejection 次数、correction 调用、decision_recovered 序列；重新通过校验不算任务成功。F0/F1 都可能有格式 / 批次纠正，F1 另外有 contract 拒绝。"
+    },
+    {
+      "name": "证据使用 / 状态更新",
+      "definition": "实际送达、review、保留帧、过期引用与 memory upsert/delete 的时间线；T2 标旧关联错误，T3 标事件边界错误。合法 frame ID 不等于语义上正确的证据。"
+    },
+    {
+      "name": "时间与完整开销",
+      "definition": "wall time、运动、模型等待、辅助调用、逻辑调用、纠正、transport attempts 与已知 token 分开；缺失 usage 记未知。过程指标按 episode 聚合，不把数百次相关决策当独立样本。"
+    },
+    {
+      "name": "人工准备 / 复位",
+      "definition": "每回合单记 setupSec、resetSec、demoId 和复位核对；视频各录一次跨方法复用，不计成额外独立场景。"
     }
   ],
   "sources": [
+    {
+      "title": "FDS · 实际方法与实验定位",
+      "url": "https://github.com/happytianhao/FDS/blob/13a36d281c6fb91f040bd16d65eeea760e463d80/docs/paper_positioning.md",
+      "note": "私有来源，固定提交 13a36d2：FDS、memory、skill 与 RSI 分别作为因素。"
+    },
+    {
+      "title": "FDS · 实际运行时",
+      "url": "https://github.com/happytianhao/FDS/blob/13a36d281c6fb91f040bd16d65eeea760e463d80/src/fds/task_harness/runtime.py",
+      "note": "off/full、显式记忆、回看窗口、决策纠正与 verdict 的实际调用链。"
+    },
+    {
+      "title": "FDS · 默认配置",
+      "url": "https://github.com/happytianhao/FDS/blob/13a36d281c6fb91f040bd16d65eeea760e463d80/configs/robomme_plus/task_harness.toml",
+      "note": "gpt-6-astra medium、4 个关键帧、空 skills；仿真参数不直接当作硬件参数。"
+    },
     {
       "title": "RoboMME-Plus · 任务与评测",
       "url": "https://robomme.github.io/plus.html",
@@ -695,36 +762,147 @@
     "scenesPerTask": 10,
     "extendedScenesPerTask": 20,
     "methodIds": [
-      "direct",
-      "history",
+      "contract-off",
       "ours"
     ],
-    "note": "每类共 10 个独立场景，两个条件各 5 个；同场景跨方法配对。扩到每类 20 场景时各条件 10 个。预实验与额外消融不计入首轮。"
+    "note": "主对比：4 类 × 每类 10 个独立场景 × F0/F1 = 80 回合；两个条件各 5 场景。Astra-Direct 用同一批场景追加 40 回合，总计 120。扩到每类 20 场景时主对比 160，含 Direct 为 240。预实验另计。"
   },
   "operatorWorkflow": [
     {
-      "title": "一次准备：录制可复用示范",
-      "body": "T1 不需要示范；T2–T4 各准备 10 个独立场景视频，共 30 段。先用独立小样本调试节奏、抓取和评分，再冻结正式场景。视频只有一段不是三个独立样本。"
+      "title": "A / B 分工",
+      "body": "A 场务负责示范、摆放、内部藏物与复位；B 控制台负责录制、启动、确认停稳、急停与结果登记。人员不足时降低吞吐，不在机器人运动时一人边移物边控制。"
     },
     {
-      "title": "每回合开始：先摆放，再核对",
-      "body": "机器人保持 home；工作人员按场景 ID 核对道具、起始或终态照片、内部藏物与示范 ID。核对结束后手退出工作区，再发送开始信号。"
+      "title": "先做独立 dev",
+      "body": "每类 2 个开发场景 × F0/F1 共 16 次试跑，另计预算。验证抓取、帧可访问性和评分；必要时降低执行难度，再冻结测试方案。"
     },
     {
-      "title": "演示与执行：分阶段进行",
-      "body": "T2–T4 播放固定视频，随后机器人在真实匹配场景中执行。人不在机器人行动时继续移动目标；播放结束后也不再改变任务状态。"
+      "title": "一次录制，反复使用",
+      "body": "T1 无演示；T2–T4 各录 10 个独立测试场景，共 30 段。按卡片节奏录制、关键事件前后停留；统一采样，不给 F1 单独挑帧。"
     },
     {
-      "title": "每回合结束：停止后复位",
-      "body": "机器人结束或按固定失败规则停止后，工作人员复位道具；额外扶正、代抓或提示属于辅助干预，保留在结果中。"
+      "title": "每种方法开局都核对",
+      "body": "按场景 ID 核对原始视频哈希、隐藏内容、可见终态与硬件配置；清空上一 episode 的 memory / keyframes。手退出且 B 确认后启动。"
     },
     {
-      "title": "跨方法重复：相同场景，顺序平衡",
-      "body": "每个场景的三个方法都用同一视频与状态。预先平衡方法顺序，避免总是 Ours 最后测；由同一操作员按清单复位，可由第二人抽查。"
+      "title": "机器人执行，人不改场景",
+      "body": "所有动作、回看和修正由 actor 自主完成。预录的人手事件只存在于共同示范中；额外人工救援必须记录，不能纳入自主成功。"
     },
     {
-      "title": "减少换装与核算人工成本",
-      "body": "T1–T3 使用现有夹爪成组进行；T4 集中装夹一次指示棒。布置 / 复位耗时与机器人执行耗时分别记录，首轮不填未经测量的分钟数。"
+      "title": "停止、复位、换方法",
+      "body": "确认停稳并禁止新指令后 A 复位；同场景换 F0/F1，顺序预先平衡。T4 集中装夹一次指示棒并核对工具偏移；人工时间和机器人时间分开登记。"
     }
-  ]
+  ],
+  "methodAlignment": {
+    "repository": "https://github.com/happytianhao/FDS",
+    "commit": "13a36d281c6fb91f040bd16d65eeea760e463d80",
+    "reviewedAt": "2026-11-09",
+    "positioning": "FDS（Falsifiable Decision State）是可独立开关的决策状态协议。主实验衡量在相同记忆与执行能力下，声明依据、检查前置条件和利用反馈，能否减少错误行动并提高最终成功率。",
+    "facts": [
+      {
+        "title": "单 actor + 显式记忆",
+        "status": "代码已实现",
+        "body": "每轮没有隐式对话历史。objects、events、experiences 通过 upsert/delete 更新；objects 无固定条数上限，events 上限 32、experiences 上限 16。经验限于当前 episode，不能写成跨任务学习。",
+        "source": "https://github.com/happytianhao/FDS/blob/13a36d281c6fb91f040bd16d65eeea760e463d80/src/fds/task_harness/memory.py"
+      },
+      {
+        "title": "保留帧与有期限的回看窗口",
+        "status": "代码已实现",
+        "body": "默认最多保留 4 个关键帧；初始演示抽取 16 帧、live 抽取 6 帧。review_frames 只能读取当前窗口；执行新环境批次后旧窗口过期，只有保留帧继续可见。下一轮才送达的回看图像不能提前引用。audit 不是历史图像检索入口。",
+        "source": "https://github.com/happytianhao/FDS/blob/13a36d281c6fb91f040bd16d65eeea760e463d80/src/fds/task_harness/observation.py"
+      },
+      {
+        "title": "契约校验的真实边界",
+        "status": "代码已实现 · 非语义判定器",
+        "body": "host 检查字段、候选与假设引用、图像来源、committed 时模型声明的前置状态等；不自动判断图像是否真的支持 claim，也不自动核实计数或物体身份。风险由模型申报；当前代码并未强制所有 high-risk candidate 都为 committed。",
+        "source": "https://github.com/happytianhao/FDS/blob/13a36d281c6fb91f040bd16d65eeea760e463d80/src/fds/task_harness/fds.py"
+      },
+      {
+        "title": "执行反馈与语义成功分开",
+        "status": "代码已实现",
+        "body": "执行收据被拒绝、action_error 或 trial_reset 可产生 contradicted；其余正常执行通常为 uncertain。execution_verdict 没有自动输出语义 verified/success 的分支。TCP tracking 只证明机械跟踪；误抓、误放等仍需观察和独立标注。",
+        "source": "https://github.com/happytianhao/FDS/blob/13a36d281c6fb91f040bd16d65eeea760e463d80/src/fds/task_harness/fds.py"
+      },
+      {
+        "title": "两种模式共享决策纠正",
+        "status": "代码已实现",
+        "body": "F0/F1 都有非法响应纠正，默认最多 2 次额外纠正且消耗原 max_calls。拒绝时不推进环境、不写入被拒绝的记忆。decision_recovered 只表示重新通过格式 / 协议校验，不表示物理任务恢复。最近 6 次 move_ee 反馈也由两组共享。",
+        "source": "https://github.com/happytianhao/FDS/blob/13a36d281c6fb91f040bd16d65eeea760e463d80/src/fds/task_harness/runtime.py"
+      },
+      {
+        "title": "Skill / Meta Harness / Franka",
+        "status": "边界已核对",
+        "body": "默认 skills=[]，Meta Harness 只允许训练证据驱动跨 episode 改进。当前公开接口支持 RoboMME 与 RoboMME-Plus，未发现 Franka 真机 adapter。主真机实验使用同一冻结代码，不在测试中改提示、skill 或 harness。",
+        "source": "https://github.com/happytianhao/FDS/blob/13a36d281c6fb91f040bd16d65eeea760e463d80/README.md"
+      }
+    ],
+    "configs": [
+      {
+        "title": "F0 · Contract Off",
+        "code": "[fds]\nenabled = false\ncontract_mode = \"off\"",
+        "body": "保留与 F1 相同的记忆、关键帧、几何工具、回看、基础执行指导与决策恢复；模型输入中没有 FDS contract 字段或指令。"
+      },
+      {
+        "title": "F1 · Full FDS",
+        "code": "[fds]\nenabled = true\ncontract_mode = \"full\"",
+        "body": "仅打开现有 FDS 协议。两组必须由同一代码快照和同一真机适配器生成配置；不拿修改前的 F0 对比修改后的 F1。"
+      }
+    ],
+    "controls": [
+      "锁定同一模型服务版本、effort、公共任务指令、相机、标定、控制器与终止条件；FDS 专属字段和指令是处理变量，不能声称完整 prompt 字节相同。",
+      "固定可用原始示范、采样器、保留帧上限和回看预算。动作分叉后观察自然不同；两组自主选择不同回看帧属于机制，不强行声称全程图像逐帧一致。",
+      "参考仓库默认值：keyframes=4、demo_frames=16、initial_live_frames=6、max_observation_frames=12、max_tool_calls=8、max_pose_targets=32、max_calls=100、max_tool_steps=400。仿真的 max_steps=10000 不能直接当作真机秒数；实机统一预算由独立预实验冻结。",
+      "相同上限不代表相同 token 消耗。记录所有逻辑调用、纠正、传输 attempts、已知输入 / 输出 tokens 与未知 usage；所有方法承担各自完整开销。",
+      "skills=[]；主实验关闭测试期 Meta Harness。若选训练改进后的版本，则 F0/F1 一起使用该冻结版本，并将训练成本和来源另行披露。"
+    ],
+    "ablations": [
+      {
+        "title": "F0 ↔ F1",
+        "status": "可直接配置 · 主真机实验",
+        "body": "4 类任务，40 个独立场景，每场景两组，80 回合。测整体可靠性与实际行为；不增加第五类任务。"
+      },
+      {
+        "title": "协议拒绝与纠正检查",
+        "status": "现有机制 · 离线预检",
+        "body": "用固定 mock 响应检查未送达帧引用、悬空假设和格式错误；核对拒绝不推进环境、纠正计入预算。合成错误的通过率不能当真实机器人恢复率。"
+      },
+      {
+        "title": "FDS × Memory / log-only / 去 falsifier",
+        "status": "尚需实现 · 优先放仿真",
+        "body": "当前只有 off/full。没有正式 stateless memory 开关，keyframes=0 仍保留文字记忆。不能把 Frozen、log-only、risk-adaptive 或字段消融写成已经可运行。若需要证明记忆独立贡献，在仿真补完整 2×2 对照。"
+      },
+      {
+        "title": "训练期 RSI 与 skill",
+        "status": "独立研究问题 · 首轮不加真机量",
+        "body": "训练集产生的 harness/skill 改进在 held-out 前冻结。没有试验就不宣称经验迁移或自我改进收益；真实恢复失败不足时报告分母并用仿真补机制证据。"
+      }
+    ],
+    "readiness": [
+      {
+        "title": "统一 Franka adapter",
+        "status": "待接入",
+        "body": "把真实 RGB、时间戳、7 关节与夹爪状态、TCP/FK、相机标定接入同一观察格式；F0/F1 共用 move_ee / wait / finish 的物理执行与公开错误收据。不得把仿真 action 向量直接发送硬件。"
+      },
+      {
+        "title": "演示与回看生命周期",
+        "status": "待离线验收",
+        "body": "T2–T4 把预录示范作为本 episode 的 cue 输入，不当作 one-shot 训练示例。允许在首次环境动作前回看；动作开始后按同一规则过期，禁止一组偷偷从 audit 恢复全片。"
+      },
+      {
+        "title": "证据帧与评分隔离",
+        "status": "待采集验收",
+        "body": "视频关键转移 / 释放 / 节点事件在所有策略可访问的采样或回看窗口内可见。用相同算法抽帧，不能按答案给 F1 精选关键帧。隐藏盒号、计数真值、评分标注和复位答案不给 actor。"
+      },
+      {
+        "title": "一次端到端 dev 检查",
+        "status": "待真机试跑",
+        "body": "每类先用独立开发卡片试跑 2 个场景、每场景 F0/F1 各一次，共 16 次预算外 dev 执行；测人工复位、模型等待与运动耗时，冻结容差与预算后再录制 / 锁定 40 张测试卡片。"
+      },
+      {
+        "title": "复位与暂停",
+        "status": "待实机验证",
+        "body": "A 场务负责示范与停机复位，B 控制台负责启动、确认停稳与记录。只有确认硬件静止并禁止新指令时才让人进入；软件请求暂停或位于 home 本身不是停稳保证。主测试执行期间不安排人手移动物体。"
+      }
+    ]
+  }
 }

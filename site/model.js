@@ -93,6 +93,21 @@ export function validateProject(p) {
       str(x.title, '操作步骤标题'); str(x.body, '操作步骤说明');
     });
   }
+  if (p.methodAlignment != null) {
+    const a = p.methodAlignment;
+    if (!obj(a)) fail('方法对齐信息无效');
+    for (const key of ['repository', 'commit', 'reviewedAt', 'positioning']) str(a[key], 'methodAlignment.' + key);
+    if (!safeUrl(a.repository)) fail('方法仓库链接无效');
+    textArray(a.controls, '方法对照不变量');
+    for (const [key, fields] of [['facts', ['title', 'status', 'body', 'source']], ['configs', ['title', 'code', 'body']], ['ablations', ['title', 'status', 'body']], ['readiness', ['title', 'status', 'body']]]) {
+      if (!Array.isArray(a[key]) || a[key].length > 100) fail('方法对齐条目无效');
+      a[key].forEach(x => {
+        if (!obj(x)) fail('方法对齐条目无效');
+        fields.forEach(f => str(x[f], 'methodAlignment.' + key + '.' + f));
+        if (key === 'facts' && !safeUrl(x.source)) fail('实现依据链接无效');
+      });
+    }
+  }
   if (!Array.isArray(p.coverage) || p.coverage.length !== 16) fail('覆盖矩阵需要保留全部 16 项基准任务');
   unique(p.coverage.map(c => c.benchmark), '基准任务');
   p.coverage.forEach(c => {
@@ -122,10 +137,12 @@ export function validateProject(p) {
     if (t.repeatIndex < 1) fail('重复编号从 1 开始');
     for (const f of ['durationSec', 'inferenceSec', 'motionSec']) number(t[f], f);
     for (const f of ['setupSec', 'resetSec']) if (t[f] !== undefined) number(t[f], f);
+    for (const f of ['decisionRejections', 'decisionRecoveries']) if (t[f] !== undefined) number(t[f], f, true);
+    if (t.decisionRejections != null && t.decisionRecoveries != null && t.decisionRecoveries > t.decisionRejections) fail('协议恢复序列数不能超过拒绝数');
     if (t.demoId !== undefined) str(t.demoId, '示范 ID');
     if (t.resetVerified != null && typeof t.resetVerified !== 'boolean') fail('复位核对必须为布尔值或 null');
     number(t.tokens, 'tokens', true);
-    for (const f of ['targetCorrect', 'orderCorrect', 'staleMemoryUsed']) {
+    for (const f of ['targetCorrect', 'orderCorrect', 'staleMemoryUsed', 'semanticFailureObserved', 'prematureAction']) {
       if (t[f] != null && typeof t[f] !== 'boolean') fail(f + ' 应为布尔值或 null');
     }
     textArray(t.failureTags, '失败标签');
@@ -165,7 +182,7 @@ export function statistics(trials) {
 }
 
 export function toCsv(rows) {
-  const keys = ['id', 'taskId', 'conditionId', 'methodId', 'scenarioId', 'repeatIndex', 'phase', 'outcome', 'demoId', 'resetVerified', 'setupSec', 'resetSec', 'durationSec', 'inferenceSec', 'motionSec', 'tokens', 'targetCorrect', 'orderCorrect', 'staleMemoryUsed', 'failureTags', 'modelVersion', 'configRevision', 'notes', 'videoUrl', 'createdAt'];
+  const keys = ['id', 'taskId', 'conditionId', 'methodId', 'scenarioId', 'repeatIndex', 'phase', 'outcome', 'demoId', 'resetVerified', 'setupSec', 'resetSec', 'durationSec', 'inferenceSec', 'motionSec', 'tokens', 'targetCorrect', 'orderCorrect', 'staleMemoryUsed', 'decisionRejections', 'decisionRecoveries', 'semanticFailureObserved', 'prematureAction', 'failureTags', 'modelVersion', 'configRevision', 'notes', 'videoUrl', 'createdAt'];
   const cell = v => {
     let value = Array.isArray(v) ? v.join(' / ') : String(v ?? '');
     if (/^[=+\-@\t\r]/.test(value)) value = "'" + value;
