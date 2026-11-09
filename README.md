@@ -2,22 +2,26 @@
 
 Franka + Astra / FDS 的实验设计与记录网页。纯静态 HTML / CSS / JavaScript，适合 GitHub Pages 项目路径，无运行时依赖、数据库或访问令牌。
 
-## v0.4 阅读布局
+## v0.4.1 中文说明修订
 
-参考 [Astranomy 项目页](https://research.nvidia.com/labs/srl/projects/astranomy/index.html) 的章节结构，将首页改为连续阅读的研究方案：标题与资源链接、文章目录、方法对照、四类任务、人工流程、能力边界与结果。任务示意为 SVG，不代表实拍或实测；流程和操作卡按需展开。
+缩短首页与任务标题，统一 F0 / F1 名称，并把操作卡按“准备、人工步骤、机器人步骤、成功标准、复位”排列。正文列出四类任务的基准来源与改编，方法和统计细节保留在对应章节；实验编号、英文指令、条件和预算保持不变。兼容缺少人工操作字段的旧草稿。
 
-“实验记录”和“操作与维护”保留完整记录、任务进度、覆盖矩阵、协议、预算与导入导出。原有 `#method`、`#tasks/T2` 等链接仍有效；新增 `#study-method`、`#study-tasks` 等正文锚点。此次只调整呈现，保留四类实验和全部数据字段。
+## v0.4 阅读布局与说明
 
-## v0.3 方法对齐
+参考 [Astranomy 项目页](https://research.nvidia.com/labs/srl/projects/astranomy/index.html) 的章节结构，首页采用连续阅读的研究方案排版：先说明核心问题与两组对比（不启用 FDS 的 F0 vs. 启用 FDS 的 F1），再依次展示四类真机任务、现场双人流程、基准来源与改编边界，以及实验结果表。任务配图为动作逻辑示意（SVG），不代表实拍或已测结果；点击任一任务即可展开实验操作卡。
 
-方案依据 FDS 固定提交 `13a36d281c6fb91f040bd16d65eeea760e463d80` 的实际实现核对。`#method` 页面列出实现依据、两组配置、机制边界和真机接入事项。
+“实验记录”和“操作与维护”保留完整的逐回合录入、任务准备进度、16 项基准覆盖矩阵、评测规则、测试量估算与 JSON / CSV 导入导出。原有 `#method`、`#tasks/T2` 等路由与 `#study-method`、`#study-tasks` 等正文锚点均保持不变。
 
-- 主对比为同一 Task Harness 的 F0（contract off）与 F1（full）；两组保持相同记忆、关键帧、工具、控制层和预算，`skills=[]`，无测试期 Meta Harness 更新。
-- 原始 Astra-Direct 保留为可选系统参考，不用它单独归因 FDS 效果；旧版 Astra-History 不是当前仓库的 matched baseline。
-- 四类任务为成功事件计数、藏物假设更新、真实事件边界指代、工具端顺序复现。T3 的条件已修订，旧记录不可只改任务名后混用。
-- `decision_recovered` 是协议恢复，不是物理任务成功。合法 frame ID 不保证语义判断正确。当前 `execution_verdict` 只输出 uncertain / contradicted。
-- 尚未发现 Franka adapter；实机适配、采样生命周期、复位与评分需先验收。仅有 off/full 开关，log-only、Memory-off、risk-adaptive 等不能记为已完成消融。
-- 本页公开实验方案、FDS 方法说明与配置；FDS 来源仓库仍为私有，代码链接需要相应访问权限。研究计划的完成不代表实验结果已经获得。
+## v0.3 方法与代码核对
+
+方案依据 FDS 固定提交 `13a36d281c6fb91f040bd16d65eeea760e463d80` 的实际代码核对。`#method` 页面列出代码已实现机制、F0/F1 配置对比、核对边界与上机前接入清单：
+
+- 主对比为同一套执行框架（Task Harness）下的 **F0（不启用 FDS，`contract_mode=off`）** 与 **F1（启用 FDS，`contract_mode=full`）**；两组共用完全相同的显式记忆、保留关键帧、画面回看、几何工具、底层控制与调用预算，不加载技能库（`skills=[]`），测试期也不做跨任务更新（Meta Harness）。
+- 原始 Astra-Direct 保留为可选系统参考（同场景可追加 40 次），用于观察整套系统的总体表现，不把 F1 与 Direct 的差异单独算作 FDS 契约的贡献。
+- 四类真机任务分别改编自 RoboMME-Plus 的四个官方类别（Counting / Permanence / Reference / Imitation）：**抓放积木，完成指定次数（T1，源自 `PickXtimes`）**、**打开藏着目标积木的盒子（T2，源自 `VideoUnmaskSwap`，新增中途换盒条件）**、**找出翻牌后首次放下积木的托盘（T3，源自 `VideoPlaceButton`，改为翻事件牌、固定托盘与经过不松手干扰）**、**用指示棒重走示范路线（T4，源自 `PatternLock`，改为固定 3×3 点阵无痕路线复现）**。
+- 系统（Host）只检查契约格式、引用编号与模型声明的前提关系是否自洽，不会自动看图判断画面内容对不对；`decision_recovered` 仅表示输出被拦截后重写通过检查，不代表机器人从抓空、放错等真实操作失误中恢复过来。
+- 当前仓库尚未内置 Franka 真机控制接口（Adapter），正式测试前需先打通接口并完成 16 次独立开发试跑；目前页面尚无真机实测数据。
+- 本页公开实验方案、FDS 方法说明与配置；FDS 代码仓库仍为私有，访问源码链接需相应权限。
 
 ## 页面
 

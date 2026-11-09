@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f8f9f6">
-  <meta name="description" content="FDS × Franka 四类真机实验：同版本契约开关对照、证据与纠错、人工操作和结果记录。">
+  <meta name="description" content="FDS × Franka 四类真机实验方案：同一套显式记忆与机械臂控制下，对比不启用 FDS（F0）与启用 FDS（F1）的操作流程、评分规则与实验记录。">
   <title>FDS × Franka · 真机实验方案</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=0.4.0">
+  <link rel="stylesheet" href="./styles.css?v=0.4.1">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -17,10 +17,10 @@
       <a href="#overview" data-route="overview">研究方案</a>
       <a href="#results" data-route="results">实验记录</a>
       <details class="tools-menu"><summary>操作与维护</summary><div class="tools-menu-list">
-        <a href="#method" data-route="method">方法实现依据</a>
-        <a href="#tasks" data-route="tasks">任务操作卡</a>
-        <a href="#coverage" data-route="coverage">完整覆盖矩阵</a>
-        <a href="#protocol" data-route="protocol">评测协议</a>
+        <a href="#method" data-route="method">方法与代码依据</a>
+        <a href="#tasks" data-route="tasks">四类任务操作卡</a>
+        <a href="#coverage" data-route="coverage">基准来源与覆盖</a>
+        <a href="#protocol" data-route="protocol">现场流程与评测</a>
         <a href="#maintain" data-route="maintain">数据维护与导出</a>
       </div></details>
     </nav>
@@ -37,6 +37,6 @@
   <dialog id="confirm-dialog" aria-labelledby="confirm-title"><h2 id="confirm-title">恢复仓库中的版本？</h2><p>当前浏览器的本机草稿会被清除。先导出数据可以保留这些修改。</p><div class="dialog-actions"><button class="button secondary" data-action="cancel-reset">保留草稿</button><button class="button primary" data-action="confirm-reset">恢复仓库版本</button></div></dialog>
   <input id="import-file" type="file" accept=".json,application/json" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="./app.js?v=0.4.0"></script>
+  <script type="module" src="./app.js?v=0.4.1"></script>
 </body>
 </html>
